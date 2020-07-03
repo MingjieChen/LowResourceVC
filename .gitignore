@@ -1,0 +1,10 @@
+__pycache__/
+*.log
+exp/
+resmp*/
+dataset/
+dump/
+stgan_adain/
+submit*.sh
+main_stgan_adain.py
+pair_list.txt
