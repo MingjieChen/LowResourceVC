@@ -169,7 +169,7 @@ class Solver(object):
             d_out_fake_trg = self.D_trg(mc_src2trg)
             d_t_loss_fake = nn.MSELoss()(d_out_fake_trg, torch.zeros_like(d_out_fake_trg).to(self.device))
 
-            d_trg_loss = 0.5 * d_t_loss_real + 0.5 * d_t_loss_fake
+            d_trg_loss =  d_t_loss_real + d_t_loss_fake
             
             # trg 2 src discriminator
 
@@ -180,9 +180,9 @@ class Solver(object):
             d_out_fake_src = self.D_src(mc_trg2src)
             d_s_loss_fake = nn.MSELoss()(d_out_fake_src, torch.zeros_like(d_out_fake_src).to(self.device))
             
-            d_src_loss = 0.5 * d_s_loss_real + 0.5 * d_s_loss_fake
+            d_src_loss =  d_s_loss_real +  d_s_loss_fake
             
-            d_loss = d_trg_loss + d_src_loss
+            d_loss = 4.0 * (d_trg_loss + d_src_loss)
             
             self.reset_grad()
             d_loss.backward()
@@ -215,10 +215,10 @@ class Solver(object):
 
                 trg2src = self.G_trg2src(mc_trg)
                 d_out_t2s_fake = self.D_src(trg2src)
-                g_out_t2s_loss = nn.L1Loss()(d_out_t2s_fake, torch.ones_like(d_out_t2s_fake).to(self.device))
+                g_out_t2s_loss = nn.MSELoss()(d_out_t2s_fake, torch.ones_like(d_out_t2s_fake).to(self.device))
                 
 
-                trg2src_back = self.G_trg2src(trg2src)
+                trg2src_back = self.G_src2trg(trg2src)
                 trg_rec_loss = nn.L1Loss()(trg2src_back, mc_trg)
                 
                 # identity
@@ -230,7 +230,7 @@ class Solver(object):
                 #if i > 10000:
                 #    self.lambda_id = 0.
 
-                g_loss = g_out_s2t_loss + g_out_t2s_loss + self.lambda_rec * (src_rec_loss + trg_rec_loss) + self.lambda_id * loss_id
+                g_loss = 4.0 * (g_out_s2t_loss + g_out_t2s_loss) + self.lambda_rec * (src_rec_loss + trg_rec_loss) + self.lambda_id * loss_id
 
                 self.reset_grad()
                 g_loss.backward()
