@@ -134,6 +134,10 @@ class Solver(object):
         
         data_iter = iter(self.train_loader)
         
+        # Learning rate cache for decaying.
+        g_lr = self.g_lr
+        d_lr = self.d_lr
+        
         start_iters = 0
         cpsyn_flag = [True, False][0]
         

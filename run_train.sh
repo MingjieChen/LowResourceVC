@@ -11,15 +11,16 @@ PYTHON=/share/mini1/sw/std/python/anaconda3-2019.07/v3.7/envs/torch_0.4/bin/pyth
 #exp=exp/0627stg1cin/
 #exp=exp/0629stg2_cin1/
 #exp=exp/0701stg_adain1/
-#exp=exp/0702st2new0/
-exp=exp/0703st2ls0/
+exp=exp/0704st2new0/
+#exp=exp/0703st2ls0/
 
-#main_script=main_st2new.py
+main_script=main_st2new.py
 #main_script=main_st2.py
 #main_script=main_st1cin.py
 #main_script=main.py
 #main_script=main_stgan_adain.py
-main_script=main_st2ls.py
+#main_script=main_st2ls.py
+
 $PYTHON $main_script --wav_dir resmp_wav22050/ \
                     --model_save_dir ${exp}/ckpt/ \
                     --sample_step 10000 \
@@ -35,6 +36,6 @@ $PYTHON $main_script --wav_dir resmp_wav22050/ \
                     --test_trg_spk VCC2SM1 \
                     --sampling_rate 22050 \
                     --speaker_path ./speaker_used.json \
-                    --batch_size 8 \
-                    --resume_iters 80000
+                    --batch_size 32 \
+                    #--resume_iters 80000
                    

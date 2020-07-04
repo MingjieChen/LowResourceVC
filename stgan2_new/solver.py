@@ -217,8 +217,8 @@ class Solver(object):
             # Compute loss for gradient penalty.
             alpha = torch.rand(mc_real.size(0), 1, 1, 1).to(self.device)
             x_hat = (alpha * mc_real.data + (1 - alpha) * mc_fake.data).requires_grad_(True)
-            #d_out_src = self.discriminator(x_hat, spk_c_org, spk_c_trg)
-            d_out_src = self.discriminator(x_hat, spk_c_trg, spk_c_org)
+            d_out_src = self.discriminator(x_hat, spk_c_org, spk_c_trg)
+            #d_out_src = self.discriminator(x_hat, spk_c_trg, spk_c_org)
             d_loss_gp = self.gradient_penalty(d_out_src, x_hat)
 
             # Backward and optimize.
