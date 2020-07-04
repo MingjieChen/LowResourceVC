@@ -8,3 +8,4 @@ stgan_adain/
 submit*.sh
 main_stgan_adain.py
 pair_list.txt
+run_train_adain.sh

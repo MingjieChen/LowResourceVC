@@ -256,8 +256,8 @@ class Solver(object):
 
                 # Backward and optimize.
 
-                #if i > 10000:
-                #    self.lambda_id = 0.
+                if i > 30000:
+                    self.lambda_id = 0.
 
                 g_loss = 4.0 * g_loss_fake \
                     + self.lambda_rec * g_loss_rec \
@@ -314,9 +314,12 @@ class Solver(object):
                         # decoded_sp_converted = world_decode_spectral_envelop(coded_sp = coded_sp_converted, fs = sampling_rate)
                         wav_transformed = world_speech_synthesis(f0=f0_converted, coded_sp=coded_sp_converted,
                                                                 ap=ap, fs=sampling_rate, frame_period=frame_period)
-
-                        librosa.output.write_wav(
-                            join(self.sample_dir, str(i+1)+'-'+wav_name.split('.')[0]+'-vcto-{}'.format(self.test_loader.trg_spk)+'.wav'), wav_transformed, sampling_rate)
+                        try:
+                            librosa.output.write_wav(
+                                join(self.sample_dir, str(i+1)+'-'+wav_name.split('.')[0]+'-vcto-{}'.format(self.test_loader.trg_spk)+'.wav'), wav_transformed, sampling_rate)
+                        except:
+                            print(f"step {i} converted voice contains nan! skip", flush=True)
+                            pass
                         if cpsyn_flag:
                             wav_cpsyn = world_speech_synthesis(f0=f0, coded_sp=coded_sp,
                                                         ap=ap, fs=sampling_rate, frame_period=frame_period)

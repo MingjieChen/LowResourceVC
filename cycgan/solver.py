@@ -135,6 +135,7 @@ class Solver(object):
         data_iter = iter(self.train_loader)
         
         start_iters = 0
+        cpsyn_flag = [True, False][0]
         
         if self.resume_iters:
             print("resuming step %d ..."% self.resume_iters)
@@ -169,7 +170,7 @@ class Solver(object):
             d_out_fake_trg = self.D_trg(mc_src2trg)
             d_t_loss_fake = nn.MSELoss()(d_out_fake_trg, torch.zeros_like(d_out_fake_trg).to(self.device))
 
-            d_trg_loss =  d_t_loss_real + d_t_loss_fake
+            d_trg_loss =  0.5 * (d_t_loss_real + d_t_loss_fake)
             
             # trg 2 src discriminator
 
@@ -180,68 +181,69 @@ class Solver(object):
             d_out_fake_src = self.D_src(mc_trg2src)
             d_s_loss_fake = nn.MSELoss()(d_out_fake_src, torch.zeros_like(d_out_fake_src).to(self.device))
             
-            d_src_loss =  d_s_loss_real +  d_s_loss_fake
+            d_src_loss = 0.5 * ( d_s_loss_real +  d_s_loss_fake)
             
-            d_loss = 4.0 * (d_trg_loss + d_src_loss)
+            d_loss = 4.0 * ( d_trg_loss + d_src_loss )
             
             self.reset_grad()
             d_loss.backward()
             self.d_optimizer.step()
-            
             # Logging.
             loss = {}
             loss['D/loss_t_real'] = d_t_loss_real.item()
             loss['D/loss_t_fake'] = d_t_loss_fake.item()
             loss['D/loss_s_fake'] = d_s_loss_fake.item()
             loss['D/loss_s_real'] = d_s_loss_real.item()
-            loss['D/loss'] = d_loss.item()
+            #loss['D/loss'] = d_loss.item()
 
               
             # train generator
             
 
-            if (i+1) % self.n_critic == 0:
+            #if (i+1) % self.n_critic == 0:
             
-                # src 2 trg
+            # src 2 trg
 
-                src2trg = self.G_src2trg(mc_src)
-                d_out_s2t_fake = self.D_trg(src2trg)
-                g_out_s2t_loss = nn.MSELoss()(d_out_s2t_fake, torch.ones_like(d_out_s2t_fake).to(self.device))
+            src2trg = self.G_src2trg(mc_src)
+            d_out_s2t_fake = self.D_trg(src2trg)
+            g_out_s2t_loss = nn.MSELoss()(d_out_s2t_fake, torch.ones_like(d_out_s2t_fake).to(self.device))
 
-                src2trg_back = self.G_trg2src(src2trg)
-                src_rec_loss = nn.L1Loss()(src2trg_back, mc_src)
+            src2trg_back = self.G_trg2src(src2trg)
+            src_rec_loss = nn.L1Loss()(src2trg_back, mc_src)
 
-                # trg 2 src
+            # trg 2 src
 
-                trg2src = self.G_trg2src(mc_trg)
-                d_out_t2s_fake = self.D_src(trg2src)
-                g_out_t2s_loss = nn.MSELoss()(d_out_t2s_fake, torch.ones_like(d_out_t2s_fake).to(self.device))
-                
+            trg2src = self.G_trg2src(mc_trg)
+            d_out_t2s_fake = self.D_src(trg2src)
+            g_out_t2s_loss = nn.MSELoss()(d_out_t2s_fake, torch.ones_like(d_out_t2s_fake).to(self.device))
+            
 
-                trg2src_back = self.G_src2trg(trg2src)
-                trg_rec_loss = nn.L1Loss()(trg2src_back, mc_trg)
-                
-                # identity
-                mc_trg_fake = self.G_src2trg(mc_trg)
-                mc_src_fake = self.G_trg2src(mc_src)
-                
-                loss_id = nn.L1Loss()(mc_trg_fake, mc_trg) + nn.L1Loss()(mc_src_fake, mc_src)
-                
-                #if i > 10000:
-                #    self.lambda_id = 0.
+            trg2src_back = self.G_src2trg(trg2src)
+            trg_rec_loss = nn.L1Loss()(trg2src_back, mc_trg)
+            
+            # identity
+            mc_trg_fake = self.G_src2trg(mc_trg)
+            mc_src_fake = self.G_trg2src(mc_src)
+            
+            loss_rec = src_rec_loss + trg_rec_loss
+            loss_id = nn.L1Loss()(mc_trg_fake, mc_trg) + nn.L1Loss()(mc_src_fake, mc_src)
+            
+            if i > 10000:
+                self.lambda_id = 0.
 
-                g_loss = 4.0 * (g_out_s2t_loss + g_out_t2s_loss) + self.lambda_rec * (src_rec_loss + trg_rec_loss) + self.lambda_id * loss_id
+            g_loss = 4.0 * (g_out_s2t_loss + g_out_t2s_loss) + self.lambda_rec * loss_rec + self.lambda_id * loss_id
 
-                self.reset_grad()
-                g_loss.backward()
-                self.g_optimizer.step()
+            self.reset_grad()
+            
+            g_loss.backward()
+            
+            self.g_optimizer.step()
 
-                loss['G/loss_s2t_fake'] = g_out_s2t_loss.item()
-                loss['G/src_loss_rec'] = src_rec_loss.item()
-                loss['G/loss_t2s_fake'] = g_out_t2s_loss.item()
-                loss['G/trg_loss_rec'] = trg_rec_loss.item()
-                loss['G/loss_id'] = loss_id.item()
-                loss['G/g_loss'] = g_loss.item()   
+            loss['G/loss_s2t_fake'] = g_out_s2t_loss.item()
+            loss['G/loss_rec'] = loss_rec.item()
+            loss['G/loss_t2s_fake'] = g_out_t2s_loss.item()
+            loss['G/loss_id'] = loss_id.item()
+            #loss['G/g_loss'] = g_loss.item()   
             
             
             # Print out training information.
@@ -250,7 +252,7 @@ class Solver(object):
                 et = str(datetime.timedelta(seconds=et))[:-7]
                 log = "t [{}],i [{}/{}]".format(et, i+1, self.num_iters)
                 for tag, value in loss.items():
-                    log += ",{}:{:.4f}".format(tag, value)
+                    log += ",{}:{:.6f}".format(tag, value)
                 print(log)
 
                 for tag, value in loss.items():
@@ -272,10 +274,11 @@ class Solver(object):
                         coded_sp = world_encode_spectral_envelop(sp=sp, fs=sampling_rate, dim=num_mcep)
                         
                         coded_sp_norm = (coded_sp - self.test_loader.mcep_mean_src) / self.test_loader.mcep_std_src
-                        coded_sp_norm_tensor = torch.FloatTensor(coded_sp_norm.T).unsqueeze_(0).unsqueeze_(1).to(self.device)
-                        conds = torch.FloatTensor(self.test_loader.spk_c_trg).to(self.device)
+                        coded_sp_norm_tensor = torch.FloatTensor(coded_sp_norm.T).unsqueeze_(0).to(self.device)
+                        #conds = torch.FloatTensor(self.test_loader.spk_c_trg).to(self.device)
                         # print(conds.size())
-                        coded_sp_converted_norm = self.G_src2trg(coded_sp_norm_tensor, conds).data.cpu().numpy()
+                        #coded_sp_converted_norm = self.G_src2trg(coded_sp_norm_tensor, conds).data.cpu().numpy()
+                        coded_sp_converted_norm = self.G_src2trg(coded_sp_norm_tensor).data.cpu().numpy()
                         coded_sp_converted = np.squeeze(coded_sp_converted_norm).T * self.test_loader.mcep_std_trg + self.test_loader.mcep_mean_trg
                         coded_sp_converted = np.ascontiguousarray(coded_sp_converted)
                         # decoded_sp_converted = world_decode_spectral_envelop(coded_sp = coded_sp_converted, fs = sampling_rate)

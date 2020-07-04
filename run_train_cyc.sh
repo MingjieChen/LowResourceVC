@@ -7,7 +7,7 @@ PYTHON=/share/mini1/sw/std/python/anaconda3-2019.07/v3.7/envs/torch_0.4/bin/pyth
 
 #exp=exp/0624stg2new_4spks/
 #exp=exp/0624stg2_4spks/
-exp=exp/0627cycgan/
+exp=exp/0627cycgan1/
 main_script=main_cyc.py
 #main_script=main_st2.py
 $PYTHON $main_script --wav_dir resmp_wav22050/ \
@@ -28,5 +28,5 @@ $PYTHON $main_script --wav_dir resmp_wav22050/ \
                     --trg_spk VCC2SM1 \
                     --sampling_rate 22050 \
                     --speaker_path ./speaker_used.json \
-                    #--resume_iters 20000
+                    #--resume_iters 40000
                    
