@@ -224,7 +224,7 @@ class Solver(object):
 
             # Backward and optimize.
             #d_loss = d_loss_real + d_loss_fake + self.lambda_gp * d_loss_gp
-            d_loss = 4.0 * (d_loss_real + d_loss_fake)
+            d_loss =  (d_loss_real + d_loss_fake)
             self.reset_grad()
             d_loss.backward()
             self.d_optimizer.step()
@@ -256,10 +256,10 @@ class Solver(object):
 
                 # Backward and optimize.
 
-                if i > 30000:
+                if i > 10000:
                     self.lambda_id = 0.
 
-                g_loss = 4.0 * g_loss_fake \
+                g_loss = g_loss_fake \
                     + self.lambda_rec * g_loss_rec \
                     + self.lambda_id * g_loss_id
 
@@ -282,7 +282,7 @@ class Solver(object):
                 et = str(datetime.timedelta(seconds=et))[:-7]
                 log = "Elapsed [{}], Iteration [{}/{}]".format(et, i+1, self.num_iters)
                 for tag, value in loss.items():
-                    log += ", {}: {:.4f}".format(tag, value)
+                    log += ", {}: {:.7f}".format(tag, value)
                 print(log, flush=True)
 
                 if self.use_tensorboard:

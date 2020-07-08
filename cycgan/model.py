@@ -12,6 +12,16 @@ def pixel_shuffle(x, size=2):
     
     return x.view(b, new_c, new_t) 
 
+class GLU(nn.Module):
+    ''' GLU block, do not split channels dimension'''
+
+    def __init__(self,):
+        super().__init__()
+
+    def forward(self, x):
+        
+        return x * torch.sigmoid(x)
+
 
 
 class Upsample1DBlock(nn.Module):
@@ -22,7 +32,7 @@ class Upsample1DBlock(nn.Module):
 
         self.conv = nn.Conv1d(dim_in, dim_out, kernel_size = kernel_size, stride = stride, padding = padding, bias = False)
         self.inst_norm = nn.InstanceNorm1d(dim_out //2, affine = True)
-        self.glu = nn.GLU(1)
+        self.glu = GLU()
         
     def forward(self, x):
         

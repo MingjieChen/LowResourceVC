@@ -36,7 +36,15 @@ class ConditionalInstanceNormalisation(nn.Module):
         h = h * gamma + beta
 
         return h
+class GLU(nn.Module):
+    ''' GLU block, do not split channels dimension'''
 
+    def __init__(self,):
+        super().__init__()
+
+    def forward(self, x):
+        
+        return x * torch.sigmoid(x)
 
 class ResidualBlock(nn.Module):
     """Residual Block with instance normalization."""
@@ -44,7 +52,8 @@ class ResidualBlock(nn.Module):
         super(ResidualBlock, self).__init__()
         self.conv_1 = nn.Conv1d(dim_in, dim_out, kernel_size=3, stride=1, padding=1, bias=False)
         self.cin_1 = ConditionalInstanceNormalisation(dim_out, style_num)
-        self.relu_1 = nn.GLU(dim=1)
+        #self.relu_1 = nn.GLU(dim=1)
+        self.relu_1 = GLU()
 
     def forward(self, x, c_src, c_trg):
         x_ = self.conv_1(x)
@@ -61,17 +70,18 @@ class Generator(nn.Module):
         # Down-sampling layers
         self.down_sample_1 = nn.Sequential(
             nn.Conv2d(in_channels=1, out_channels=128, kernel_size=(3, 9), padding=(1, 4), bias=False),
-            nn.GLU(dim=1)
+            GLU()
         )
         self.down_sample_2 = nn.Sequential(
-            nn.Conv2d(in_channels=64, out_channels=256, kernel_size=(4, 8), stride=(2, 2), padding=(1, 3), bias=False),
-            nn.InstanceNorm2d(num_features=256, affine=True, track_running_stats=True),
-            nn.GLU(dim=1)
+            nn.Conv2d(in_channels=128, out_channels=256, kernel_size=(4, 8), stride=(2, 2), padding=(1, 3), bias=False),
+            nn.InstanceNorm2d(num_features=256, affine=True),
+            GLU()
+            #nn.GLU(dim=1)
         )
         self.down_sample_3 = nn.Sequential(
-            nn.Conv2d(in_channels=128, out_channels=512, kernel_size=(4, 8), stride=(2, 2), padding=(1, 3), bias=False),
-            nn.InstanceNorm2d(num_features=512, affine=True, track_running_stats=True),
-            nn.GLU(dim=1)
+            nn.Conv2d(in_channels=256, out_channels=256, kernel_size=(4, 8), stride=(2, 2), padding=(1, 3), bias=False),
+            nn.InstanceNorm2d(num_features=256, affine=True),
+            GLU()
         )
 
         # Down-conversion layers.
@@ -86,15 +96,15 @@ class Generator(nn.Module):
         )
 
         # Bottleneck layers.
-        self.residual_1 = ResidualBlock(dim_in=256, dim_out=512, style_num=num_speakers)
-        self.residual_2 = ResidualBlock(dim_in=256, dim_out=512, style_num=num_speakers)
-        self.residual_3 = ResidualBlock(dim_in=256, dim_out=512, style_num=num_speakers)
-        self.residual_4 = ResidualBlock(dim_in=256, dim_out=512, style_num=num_speakers)
-        self.residual_5 = ResidualBlock(dim_in=256, dim_out=512, style_num=num_speakers)
-        self.residual_6 = ResidualBlock(dim_in=256, dim_out=512, style_num=num_speakers)
-        self.residual_7 = ResidualBlock(dim_in=256, dim_out=512, style_num=num_speakers)
-        self.residual_8 = ResidualBlock(dim_in=256, dim_out=512, style_num=num_speakers)
-        self.residual_9 = ResidualBlock(dim_in=256, dim_out=512, style_num=num_speakers)
+        self.residual_1 = ResidualBlock(dim_in=256, dim_out=256, style_num=num_speakers)
+        self.residual_2 = ResidualBlock(dim_in=256, dim_out=256, style_num=num_speakers)
+        self.residual_3 = ResidualBlock(dim_in=256, dim_out=256, style_num=num_speakers)
+        self.residual_4 = ResidualBlock(dim_in=256, dim_out=256, style_num=num_speakers)
+        self.residual_5 = ResidualBlock(dim_in=256, dim_out=256, style_num=num_speakers)
+        self.residual_6 = ResidualBlock(dim_in=256, dim_out=256, style_num=num_speakers)
+        self.residual_7 = ResidualBlock(dim_in=256, dim_out=256, style_num=num_speakers)
+        self.residual_8 = ResidualBlock(dim_in=256, dim_out=256, style_num=num_speakers)
+        self.residual_9 = ResidualBlock(dim_in=256, dim_out=256, style_num=num_speakers)
 
         # Up-conversion layers.
         self.up_conversion = nn.Conv1d(in_channels=256,
@@ -107,17 +117,17 @@ class Generator(nn.Module):
         # Up-sampling layers.
         self.up_sample_1 = nn.Sequential(
             nn.ConvTranspose2d(in_channels=256, out_channels=256, kernel_size=4, stride=2, padding=1, bias=False),
-            nn.InstanceNorm2d(num_features=256, affine=True, track_running_stats=True),
-            nn.GLU(dim=1)
+            nn.InstanceNorm2d(num_features=256, affine=True),
+            GLU()
         )
         self.up_sample_2 = nn.Sequential(
-            nn.ConvTranspose2d(in_channels=128, out_channels=128, kernel_size=4, stride=2, padding=1, bias=False),
-            nn.InstanceNorm2d(num_features=128, affine=True, track_running_stats=True),
-            nn.GLU(dim=1)
+            nn.ConvTranspose2d(in_channels=256, out_channels=128, kernel_size=4, stride=2, padding=1, bias=False),
+            nn.InstanceNorm2d(num_features=128, affine=True),
+            GLU()
         )
 
         # Out.
-        self.out = nn.Conv2d(in_channels=64, out_channels=1, kernel_size=7, stride=1, padding=3, bias=False)
+        self.out = nn.Conv2d(in_channels=128, out_channels=1, kernel_size=7, stride=1, padding=3, bias=False)
 
     def forward(self, x, c_src, c_trg):
         width_size = x.size(3)
@@ -166,23 +176,23 @@ class Discriminator(nn.Module):
         # Down-sampling layers.
         self.down_sample_1 = nn.Sequential(
             nn.Conv2d(in_channels=64, out_channels=256, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False),
-            nn.InstanceNorm2d(num_features=256, affine=True, track_running_stats=True),
-            nn.GLU(dim=1)
+            nn.InstanceNorm2d(num_features=256, affine=True),
+            GLU()
         )
         self.down_sample_2 = nn.Sequential(
-            nn.Conv2d(in_channels=128, out_channels=512, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False),
-            nn.InstanceNorm2d(num_features=512, affine=True, track_running_stats=True),
-            nn.GLU(dim=1)
+            nn.Conv2d(in_channels=256, out_channels=512, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False),
+            nn.InstanceNorm2d(num_features=512, affine=True),
+            GLU()
         )
         self.down_sample_3 = nn.Sequential(
-            nn.Conv2d(in_channels=256, out_channels=1024, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False),
-            nn.InstanceNorm2d(num_features=1024, affine=True, track_running_stats=True),
-            nn.GLU(dim=1)
+            nn.Conv2d(in_channels=512, out_channels=1024, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False),
+            nn.InstanceNorm2d(num_features=1024, affine=True),
+            GLU()
         )
         self.down_sample_4 = nn.Sequential(
-            nn.Conv2d(in_channels=512, out_channels=1024, kernel_size=(1, 5), stride=(1, 1), padding=(0, 2), bias=False),
-            nn.InstanceNorm2d(num_features=1024, affine=True, track_running_stats=True),
-            nn.GLU(dim=1)
+            nn.Conv2d(in_channels=1024, out_channels=512, kernel_size=(1, 5), stride=(1, 1), padding=(0, 2), bias=False),
+            nn.InstanceNorm2d(num_features=512, affine=True),
+            GLU()
         )
 
         # Fully connected layer.

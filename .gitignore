@@ -9,3 +9,7 @@ submit*.sh
 main_stgan_adain.py
 pair_list.txt
 run_train_adain.sh
+main_stadain_doubdis.py
+stgan_adain_doubdis/
+main_st2new_spkcls.py
+stgan2_new_spkcls/

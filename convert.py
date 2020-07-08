@@ -1,6 +1,6 @@
 import argparse
-#from stgan2_new.model import Generator
-from stgan.model import Generator
+from stgan2_new.model import Generator
+#from stgan.model import Generator
 #from model2 import Generator as Generator2
 from torch.autograd import Variable
 import torch
@@ -121,7 +121,9 @@ def process_test_loader(test_loader, G, device, sampling_rate, num_mcep, frame_p
             coded_sp_norm_tensor = torch.FloatTensor(coded_sp_norm.T).unsqueeze_(0).unsqueeze_(1).to(device)
             spk_conds = torch.FloatTensor(test_loader.spk_c_trg).to(device)
             # print(spk_conds.size())
-            coded_sp_converted_norm = G(coded_sp_norm_tensor, spk_conds).data.cpu().numpy()
+            
+            coded_sp_converted_norm = G(coded_sp_norm_tensor, spk_conds, spk_conds).data.cpu().numpy()
+            
             coded_sp_converted = np.squeeze(coded_sp_converted_norm).T * test_loader.mcep_std_trg + test_loader.mcep_mean_trg
             coded_sp_converted = np.ascontiguousarray(coded_sp_converted)
             print("After being fed into G: ", coded_sp_converted.shape)
