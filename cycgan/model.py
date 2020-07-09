@@ -52,7 +52,7 @@ class Downsample1DBlock(nn.Module):
 
         self.conv1 = nn.Conv1d(dim_in, dim_out, kernel_size = kernel_size, stride = stride, padding = padding, bias = False)
         self.inst_norm = nn.InstanceNorm1d(dim_out, affine = True)
-        self.glu = nn.GLU(1)
+        self.glu = GLU()
     def forward(self, x):
         out = self.conv1(x)
         out = self.inst_norm(out)
@@ -66,7 +66,7 @@ class ResidualBlock(nn.Module):
         super(ResidualBlock, self).__init__()
         self.conv = nn.Conv1d(dim_in, dim_out, kernel_size=3, stride=1, padding=1, bias=False)
         self.inst_norm = nn.InstanceNorm1d(dim_out, affine = True)
-        self.glu = nn.GLU(1)
+        self.glu = GLU()
 
     def forward(self, x):
         x_ = self.conv(x)
@@ -83,25 +83,25 @@ class Generator(nn.Module):
         
         layers = []
 
-        layers.append(nn.Conv1d(input_dim, 256, kernel_size = 15, stride = 1, padding = 7, bias = False))
-        layers.append(nn.GLU(1))
+        layers.append(nn.Conv1d(input_dim, 128, kernel_size = 15, stride = 1, padding = 7, bias = False))
+        layers.append(GLU())
 
         # Downsample
 
         layers.append(Downsample1DBlock(128, 256, 5, 2, 1))
-        layers.append(Downsample1DBlock(128, 512, 5, 2, 2))
+        layers.append(Downsample1DBlock(256, 256, 5, 2, 2))
 
         # Bottleneck layers
 
         for _ in range(repeat_num):
-            layers.append( ResidualBlock(256, 512))
+            layers.append(ResidualBlock(256, 256))
         
         # Upsample
         
         layers.append(Upsample1DBlock(256, 512, 5, 1, 2))
-        layers.append(Upsample1DBlock(128, 256, 5, 1, 2))
+        layers.append(Upsample1DBlock(256, 256, 5, 1, 2))
         
-        layers.append(nn.Conv1d(64, input_dim, kernel_size = 15, stride = 1, padding = 7, bias = False  ))
+        layers.append(nn.Conv1d(128, input_dim, kernel_size = 15, stride = 1, padding = 7, bias = False  ))
         
         self.main = nn.Sequential(*layers)
     def forward(self, x):
@@ -113,17 +113,17 @@ class Generator(nn.Module):
 
 
 class Discriminator(nn.Module):
-    def __init__(self, input_size=(36, 256), conv_dim=128, repeat_num=3):
+    def __init__(self, input_size=(36, 256), conv_dim=128, repeat_num=4):
         super(Discriminator, self).__init__()
         layers = []
-        layers.append(nn.Conv2d(1, 2 *conv_dim, kernel_size=2, stride=[1,2], padding=1))
-        layers.append(nn.GLU(dim = 1))
+        layers.append(nn.Conv2d(1, conv_dim, kernel_size=[3,4], stride=[1,2], padding=1))
+        layers.append(GLU())
 
         curr_dim = conv_dim
-        for i in range(0, repeat_num):
-            layers.append(nn.Conv2d(curr_dim , curr_dim*4, kernel_size=3, stride=2, padding=1))
-            layers.append(nn.InstanceNorm2d(curr_dim *4, affine = True))
-            layers.append(nn.GLU(dim=1))
+        for i in range(1, repeat_num):
+            layers.append(nn.Conv2d(curr_dim , curr_dim*2, kernel_size=4, stride=2, padding=1))
+            layers.append(nn.InstanceNorm2d(curr_dim *2, affine = True))
+            layers.append(GLU())
             curr_dim = curr_dim * 2
 
         self.main = nn.Sequential(*layers)

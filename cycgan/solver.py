@@ -187,7 +187,7 @@ class Solver(object):
             
             d_src_loss = 0.5 * ( d_s_loss_real +  d_s_loss_fake)
             
-            d_loss = 4.0 * ( d_trg_loss + d_src_loss )
+            d_loss =  ( d_trg_loss + d_src_loss )
             
             self.reset_grad()
             d_loss.backward()
@@ -232,10 +232,10 @@ class Solver(object):
             loss_rec = src_rec_loss + trg_rec_loss
             loss_id = nn.L1Loss()(mc_trg_fake, mc_trg) + nn.L1Loss()(mc_src_fake, mc_src)
             
-            if i > 10000:
-                self.lambda_id = 0.
+            #if i > 10000:
+            #    self.lambda_id = 0.
 
-            g_loss = 4.0 * (g_out_s2t_loss + g_out_t2s_loss) + self.lambda_rec * loss_rec + self.lambda_id * loss_id
+            g_loss = (g_out_s2t_loss + g_out_t2s_loss) + self.lambda_rec * loss_rec + self.lambda_id * loss_id
 
             self.reset_grad()
             

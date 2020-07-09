@@ -117,17 +117,15 @@ class Generator(nn.Module):
         # Up-sampling layers.
         self.up_sample_1 = nn.Sequential(
             nn.ConvTranspose2d(in_channels=256, out_channels=256, kernel_size=4, stride=2, padding=1, bias=False),
-            nn.InstanceNorm2d(num_features=256, affine=True),
             GLU()
         )
         self.up_sample_2 = nn.Sequential(
             nn.ConvTranspose2d(in_channels=256, out_channels=128, kernel_size=4, stride=2, padding=1, bias=False),
-            nn.InstanceNorm2d(num_features=128, affine=True),
             GLU()
         )
 
         # Out.
-        self.out = nn.Conv2d(in_channels=128, out_channels=1, kernel_size=7, stride=1, padding=3, bias=False)
+        self.out = nn.Conv2d(in_channels=128, out_channels=1, kernel_size=(5,15), stride=1, padding=(2,7), bias=False)
 
     def forward(self, x, c_src, c_trg):
         width_size = x.size(3)
@@ -158,6 +156,19 @@ class Generator(nn.Module):
 
         return x
 
+class PixelShuffle2d(nn.Module):
+    '''pixel shuffle for up samplinga'''
+    def __init__(self, factor = 2):
+        super().__init__()
+
+        self.factor = factor
+    def forward(self, x):
+        
+        b, c, h, w = x.size()
+
+        new_c, new_h, new_w = c // (2 *self.factor), h * self.factor, w * self.factor
+
+        return x.view(b, new_c, new_h, new_w)
 
 class Discriminator(nn.Module):
     """Discriminator network."""
@@ -170,12 +181,12 @@ class Discriminator(nn.Module):
         # Initial layers.
         self.conv_layer_1 = nn.Sequential(
             nn.Conv2d(in_channels=1, out_channels=128, kernel_size=(3, 3), stride=(1, 1), padding=1),
-            nn.GLU(dim=1)
+            GLU()
         )
 
         # Down-sampling layers.
         self.down_sample_1 = nn.Sequential(
-            nn.Conv2d(in_channels=64, out_channels=256, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False),
+            nn.Conv2d(in_channels=128, out_channels=256, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False),
             nn.InstanceNorm2d(num_features=256, affine=True),
             GLU()
         )
