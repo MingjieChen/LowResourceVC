@@ -36,6 +36,45 @@ class ConditionalInstanceNormalisation(nn.Module):
         h = h * gamma + beta
 
         return h
+class GDown(nn.Module):
+    def __init__(self, dim_in, dim_out, kernel_size, stride, padding):
+        super().__init__()
+
+        self.conv = nn.Conv2d(dim_in, dim_out, kernel_size = kernel_size, stride = stride, padding = padding)
+        self.gates = nn.Conv2d(dim_in, dim_out, kernel_size = kernel_size, stride = stride, padding = padding)
+        
+        self.conv_norm = nn.InstanceNorm2d(dim_out, affine = True)
+        self.gate_norm = nn.InstanceNorm2d(dim_out, affine = True)
+    def forward(self, x):
+        
+        conv = self.conv(x)
+        conv = self.conv_norm(conv)
+        
+        gate = self.gates(x)
+        gate = self.gate_norm(gate)
+
+        return conv * torch.sigmoid(gate)
+
+class GUp(nn.Module):
+    def __init__(self, dim_in, dim_out, kernel_size, stride, padding):
+        super().__init__()
+
+        #self.conv = nn.Conv2d(dim_in, dim_out, kernel_size = kernel_size, stride = stride, padding = padding)
+        self.conv = nn.ConvTranspose2d(in_channels=dim_in, out_channels=dim_out, kernel_size=kernel_size, stride=stride, padding=padding)
+        #self.gates = nn.Conv2d(dim_in, dim_out, kernel_size = kernel_size, stride = stride, padding = padding)
+        self.gates = nn.ConvTranspose2d(in_channels=dim_in, out_channels=dim_out, kernel_size=kernel_size, stride=stride, padding= padding)
+        
+    def forward(self, x):
+        
+        conv = self.conv(x)
+        #conv = self.conv_norm(conv)
+        
+        gate = self.gates(x)
+        #gate = self.gate_norm(gate)
+
+        return conv * torch.sigmoid(gate)
+
+
 class GLU(nn.Module):
     ''' GLU block, do not split channels dimension'''
 
@@ -50,16 +89,28 @@ class ResidualBlock(nn.Module):
     """Residual Block with instance normalization."""
     def __init__(self, dim_in, dim_out, style_num):
         super(ResidualBlock, self).__init__()
-        self.conv_1 = nn.Conv1d(dim_in, dim_out, kernel_size=3, stride=1, padding=1, bias=False)
+        self.conv_1 = nn.Conv1d(dim_in, dim_out, kernel_size=3, stride=1, padding=1, bias = False)
         self.cin_1 = ConditionalInstanceNormalisation(dim_out, style_num)
-        #self.relu_1 = nn.GLU(dim=1)
         self.relu_1 = GLU()
+        
+        #self.conv1 = nn.Conv1d(dim_in, dim_out, kernel_size = 3, stride = 1, padding =1)
+        #self.conv_norm = ConditionalInstanceNormalisation(dim_out, style_num)
+        
+        #self.gate1 = nn.Conv1d(dim_in, dim_out, kernel_size = 3, stride = 1, padding = 1)
+        #self.gate_norm = ConditionalInstanceNormalisation(dim_out, style_num)
 
     def forward(self, x, c_src, c_trg):
         x_ = self.conv_1(x)
         x_ = self.cin_1(x_, c_src, c_trg)
         x_ = self.relu_1(x_)
+        
+        #conv = self.conv1(x)
+        #conv = self.conv_norm(conv, c_src, c_trg)
 
+        #gate = self.gate1(x)
+        #gate = self.gate_norm(gate, c_src, c_trg)
+        
+        #return conv * torch.sigmoid(gate)
         return x_
 
 
@@ -72,17 +123,26 @@ class Generator(nn.Module):
             nn.Conv2d(in_channels=1, out_channels=128, kernel_size=(3, 9), padding=(1, 4), bias=False),
             GLU()
         )
+        
+        #self.down_sample_1 = GDown(1, 128, kernel_size = (3,9), stride = 1, padding = (1,4))
+
         self.down_sample_2 = nn.Sequential(
             nn.Conv2d(in_channels=128, out_channels=256, kernel_size=(4, 8), stride=(2, 2), padding=(1, 3), bias=False),
             nn.InstanceNorm2d(num_features=256, affine=True),
             GLU()
             #nn.GLU(dim=1)
         )
+        
+        #self.down_sample_2 = GDown(128, 256, kernel_size = (4,8), stride = (2,2), padding = (2,3))
+
         self.down_sample_3 = nn.Sequential(
             nn.Conv2d(in_channels=256, out_channels=256, kernel_size=(4, 8), stride=(2, 2), padding=(1, 3), bias=False),
             nn.InstanceNorm2d(num_features=256, affine=True),
             GLU()
         )
+        
+        #self.down_sample_3 = GDown(256, 256, kernel_size = (4,8), stride = (2,2), padding = (1,3))
+
 
         # Down-conversion layers.
         self.down_conversion = nn.Sequential(
@@ -119,10 +179,14 @@ class Generator(nn.Module):
             nn.ConvTranspose2d(in_channels=256, out_channels=256, kernel_size=4, stride=2, padding=1, bias=False),
             GLU()
         )
+        #self.up_sample_1 = GUp(256, 256, kernel_size = 4, stride = 2, padding =1)
+        
         self.up_sample_2 = nn.Sequential(
             nn.ConvTranspose2d(in_channels=256, out_channels=128, kernel_size=4, stride=2, padding=1, bias=False),
             GLU()
         )
+
+        #self.up_sample_2 = GUp(256, 128, kernel_size = 4, stride = 2, padding= 1)
 
         # Out.
         self.out = nn.Conv2d(in_channels=128, out_channels=1, kernel_size=(5,15), stride=1, padding=(2,7), bias=False)
@@ -170,6 +234,26 @@ class PixelShuffle2d(nn.Module):
 
         return x.view(b, new_c, new_h, new_w)
 
+class DisDown(nn.Module):
+    def __init__(self, dim_in, dim_out, kernel_size, stride, padding):
+        
+        super().__init__()
+
+        self.conv = nn.Conv2d(dim_in, dim_out, kernel_size = kernel_size, stride = stride, padding = padding)
+        self.gate = nn.Conv2d(dim_in, dim_out, kernel_size = kernel_size, stride = stride, padding = padding)
+        
+        self.conv_norm = nn.InstanceNorm2d(dim_out, affine = True)
+        self.gate_norm = nn.InstanceNorm2d(dim_out, affine = True)
+    
+    def forward(self, x):
+        
+        conv = self.conv(x)
+        conv = self.conv_norm(conv)
+
+        gate = self.gate(x)
+        gate = self.gate_norm(gate)
+
+        return conv * torch.sigmoid(gate)
 class Discriminator(nn.Module):
     """Discriminator network."""
     def __init__(self, num_speakers=10):
@@ -183,6 +267,8 @@ class Discriminator(nn.Module):
             nn.Conv2d(in_channels=1, out_channels=128, kernel_size=(3, 3), stride=(1, 1), padding=1),
             GLU()
         )
+        #self.conv1 = nn.Conv2d(1, 128, kernel_size= (3,3), stride = 1, padding= 1)
+        #self.gate1 = nn.Conv2d(1, 128, kernel_size = 3, stride = 1, padding = 1)
 
         # Down-sampling layers.
         self.down_sample_1 = nn.Sequential(
@@ -190,22 +276,27 @@ class Discriminator(nn.Module):
             nn.InstanceNorm2d(num_features=256, affine=True),
             GLU()
         )
+        #self.down_sample_1 = DisDown(128, 256, kernel_size = 3, stride = 2, padding = 1)
+
         self.down_sample_2 = nn.Sequential(
             nn.Conv2d(in_channels=256, out_channels=512, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False),
             nn.InstanceNorm2d(num_features=512, affine=True),
             GLU()
         )
+        #self.down_sample_2 = DisDown(256, 512, kernel_size = 3, stride = 2, padding = 1)
+        
         self.down_sample_3 = nn.Sequential(
             nn.Conv2d(in_channels=512, out_channels=1024, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False),
             nn.InstanceNorm2d(num_features=1024, affine=True),
             GLU()
         )
+        #self.down_sample_3 = DisDown(512, 1024, kernel_size = 3, stride = 2, padding = 1)
         self.down_sample_4 = nn.Sequential(
             nn.Conv2d(in_channels=1024, out_channels=512, kernel_size=(1, 5), stride=(1, 1), padding=(0, 2), bias=False),
             nn.InstanceNorm2d(num_features=512, affine=True),
             GLU()
         )
-
+        #self.down_sample_4 = DisDown(1024, 512, kernel_size = (1,5), stride = 1, padding = (0,2))
         # Fully connected layer.
         self.fully_connected = nn.Linear(in_features=512, out_features=1)
         #self.fully_connected = nn.Linear(in_features=512, out_features=512)
@@ -219,6 +310,9 @@ class Discriminator(nn.Module):
         #c_onehot = c_
 
         x = self.conv_layer_1(x)
+        #x_conv = self.conv1(x)
+        #x_gate = self.gate1(x)
+        #out = x_conv * torch.sigmoid(x_gate)
 
         x = self.down_sample_1(x)
         x = self.down_sample_2(x)
@@ -245,7 +339,7 @@ class Discriminator(nn.Module):
 
         x += torch.sum(p * h, dim=1, keepdim=True)
         '''
-        x = torch.sigmoid(x)
+        #x = torch.sigmoid(x)
         return x
 
 class PatchDiscriminator(nn.Module):

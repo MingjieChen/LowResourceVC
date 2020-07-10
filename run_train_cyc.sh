@@ -7,12 +7,12 @@ PYTHON=/share/mini1/sw/std/python/anaconda3-2019.07/v3.7/envs/torch_0.4/bin/pyth
 
 #exp=exp/0624stg2new_4spks/
 #exp=exp/0624stg2_4spks/
-exp=exp/0709cycgan0/
+exp=exp/0710cycgan0/
 main_script=main_cyc.py
 #main_script=main_st2.py
 $PYTHON $main_script --wav_dir resmp_wav22050/ \
                     --model_save_dir ${exp}/ckpt/ \
-                    --sample_step 50000 \
+                    --sample_step 10000 \
                     --model_save_step 10000\
                     --log_dir ${exp}/tb/\
                     --num_speakers 4 \

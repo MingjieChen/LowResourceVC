@@ -5,7 +5,7 @@ PYTHON=/share/mini1/sw/std/python/anaconda3-2019.07/v3.7/envs/torch_0.4/bin/pyth
 
 #$PYTHON main.py --wav_dir dump/wav16/
 
-exp=exp/0709st2ls0/
+exp=exp/0710st2ls0/
 
 
 main_script=main_st2ls.py
@@ -27,5 +27,5 @@ $PYTHON $main_script --wav_dir resmp_wav22050/ \
                     --sampling_rate 22050 \
                     --speaker_path ./speaker_used.json \
                     --batch_size 8 \
-                    #--resume_iters 100000
+                    #--resume_iters 90000
                    

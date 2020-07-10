@@ -187,7 +187,7 @@ class Solver(object):
             
             d_src_loss = 0.5 * ( d_s_loss_real +  d_s_loss_fake)
             
-            d_loss =  ( d_trg_loss + d_src_loss )
+            d_loss = 0.5 *   ( d_trg_loss + d_src_loss )
             
             self.reset_grad()
             d_loss.backward()
