@@ -210,6 +210,7 @@ class Discriminator(nn.Module):
         #self.down1 = DisDownsample(128, 256, kernel_size = [3,3], stride = 2, padding = [1,1])
         #self.down2 = DisDownsample(256, 512, kernel_size = [3,3], stride = 2, padding = [1,1])
         #self.down3 = DisDownsample(512, 1024, kernel_size = [6,3], stride = [1,2], padding = [3,2])
+        self.conv_dis = nn.Conv2d(curr_dim, 1, kernel_size=[2,4],  stride=1, padding=0, bias=False)
 
         self.main = nn.Sequential(*layers)
         self.out_linear = nn.Linear(1024, 1)
@@ -225,8 +226,8 @@ class Discriminator(nn.Module):
         #out = self.down3(out)
         
         #out_src = self.out_linear(out.permute(0,2,3,1))
-        #out_src = self.conv_dis(h)
-        out_src = self.out_linear(h.permute(0,2,3,1))
+        out_src = self.conv_dis(h)
+        #out_src = self.out_linear(h.permute(0,2,3,1))
         #out_src = torch.sigmoid(out_src)
         #out_cls_spks = self.conv_clf_spks(h)
         return out_src #out_cls_spks.view(out_cls_spks.size(0), out_cls_spks.size(1))

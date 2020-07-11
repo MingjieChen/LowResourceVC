@@ -7,10 +7,11 @@ from data_loader import get_loader, to_categorical
 
 class ConditionalInstanceNormalisation(nn.Module):
     """CIN Block."""
-    def __init__(self, dim_in, style_num):
+    def __init__(self, dim_in, style_num, device):
         super(ConditionalInstanceNormalisation, self).__init__()
 
-        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        #self.device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
+        self.device = device
 
         self.dim_in = dim_in
         self.style_num = style_num
@@ -87,11 +88,12 @@ class GLU(nn.Module):
 
 class ResidualBlock(nn.Module):
     """Residual Block with instance normalization."""
-    def __init__(self, dim_in, dim_out, style_num):
+    def __init__(self, dim_in, dim_out, style_num, device):
         super(ResidualBlock, self).__init__()
         self.conv_1 = nn.Conv1d(dim_in, dim_out, kernel_size=3, stride=1, padding=1, bias = False)
-        self.cin_1 = ConditionalInstanceNormalisation(dim_out, style_num)
+        self.cin_1 = ConditionalInstanceNormalisation(dim_out, style_num, device)
         self.relu_1 = GLU()
+
         
         #self.conv1 = nn.Conv1d(dim_in, dim_out, kernel_size = 3, stride = 1, padding =1)
         #self.conv_norm = ConditionalInstanceNormalisation(dim_out, style_num)
@@ -116,8 +118,9 @@ class ResidualBlock(nn.Module):
 
 class Generator(nn.Module):
     """Generator network."""
-    def __init__(self, num_speakers=4):
+    def __init__(self, device, num_speakers=4):
         super(Generator, self).__init__()
+        self.device = device
         # Down-sampling layers
         self.down_sample_1 = nn.Sequential(
             nn.Conv2d(in_channels=1, out_channels=128, kernel_size=(3, 9), padding=(1, 4), bias=False),
@@ -156,15 +159,15 @@ class Generator(nn.Module):
         )
 
         # Bottleneck layers.
-        self.residual_1 = ResidualBlock(dim_in=256, dim_out=256, style_num=num_speakers)
-        self.residual_2 = ResidualBlock(dim_in=256, dim_out=256, style_num=num_speakers)
-        self.residual_3 = ResidualBlock(dim_in=256, dim_out=256, style_num=num_speakers)
-        self.residual_4 = ResidualBlock(dim_in=256, dim_out=256, style_num=num_speakers)
-        self.residual_5 = ResidualBlock(dim_in=256, dim_out=256, style_num=num_speakers)
-        self.residual_6 = ResidualBlock(dim_in=256, dim_out=256, style_num=num_speakers)
-        self.residual_7 = ResidualBlock(dim_in=256, dim_out=256, style_num=num_speakers)
-        self.residual_8 = ResidualBlock(dim_in=256, dim_out=256, style_num=num_speakers)
-        self.residual_9 = ResidualBlock(dim_in=256, dim_out=256, style_num=num_speakers)
+        self.residual_1 = ResidualBlock(dim_in=256, dim_out=256, style_num=num_speakers, device = self.device)
+        self.residual_2 = ResidualBlock(dim_in=256, dim_out=256, style_num=num_speakers, device = self.device)
+        self.residual_3 = ResidualBlock(dim_in=256, dim_out=256, style_num=num_speakers, device = self.device)
+        self.residual_4 = ResidualBlock(dim_in=256, dim_out=256, style_num=num_speakers, device = self.device)
+        self.residual_5 = ResidualBlock(dim_in=256, dim_out=256, style_num=num_speakers, device = self.device)
+        self.residual_6 = ResidualBlock(dim_in=256, dim_out=256, style_num=num_speakers, device = self.device)
+        self.residual_7 = ResidualBlock(dim_in=256, dim_out=256, style_num=num_speakers, device = self.device)
+        self.residual_8 = ResidualBlock(dim_in=256, dim_out=256, style_num=num_speakers, device = self.device)
+        self.residual_9 = ResidualBlock(dim_in=256, dim_out=256, style_num=num_speakers, device = self.device)
 
         # Up-conversion layers.
         self.up_conversion = nn.Conv1d(in_channels=256,
@@ -256,12 +259,12 @@ class DisDown(nn.Module):
         return conv * torch.sigmoid(gate)
 class Discriminator(nn.Module):
     """Discriminator network."""
-    def __init__(self, num_speakers=10):
+    def __init__(self, device, num_speakers=10):
         super(Discriminator, self).__init__()
 
         self.num_speakers = num_speakers
-        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
+        #self.device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
+        self.device = device
         # Initial layers.
         self.conv_layer_1 = nn.Sequential(
             nn.Conv2d(in_channels=1, out_channels=128, kernel_size=(3, 3), stride=(1, 1), padding=1),

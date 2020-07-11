@@ -61,6 +61,7 @@ if __name__ == '__main__':
     parser.add_argument('--beta1', type=float, default=0.5, help='beta1 for Adam optimizer')
     parser.add_argument('--beta2', type=float, default=0.999, help='beta2 for Adam optimizer')
     parser.add_argument('--resume_iters', type=int, default=None, help='resume training from this step')
+    parser.add_argument('--device', type=int, default=0, help='choosing cuda device')
 
     # Test configuration.
     parser.add_argument('--test_iters', type=int, default=100000, help='test model from this step')

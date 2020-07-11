@@ -44,7 +44,7 @@ class Solver(object):
 
         # Miscellaneous.
         self.use_tensorboard = config.use_tensorboard
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.device = torch.device(f'cuda:{config.device}' if torch.cuda.is_available() else 'cpu')
 
         # Directories.
         self.log_dir = config.log_dir
@@ -64,8 +64,8 @@ class Solver(object):
 
     def build_model(self):
         """Create a generator and a discriminator."""
-        self.generator = Generator(num_speakers=self.num_speakers)
-        self.discriminator = Discriminator(num_speakers=self.num_speakers)
+        self.generator = Generator(num_speakers=self.num_speakers, device = self.device)
+        self.discriminator = Discriminator(num_speakers=self.num_speakers, device = self.device)
 
         self.g_optimizer = torch.optim.Adam(self.generator.parameters(), self.g_lr, [self.beta1, self.beta2])
         self.d_optimizer = torch.optim.Adam(self.discriminator.parameters(), self.d_lr, [self.beta1, self.beta2])

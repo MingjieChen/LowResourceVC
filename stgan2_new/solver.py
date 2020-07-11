@@ -44,7 +44,7 @@ class Solver(object):
 
         # Miscellaneous.
         self.use_tensorboard = config.use_tensorboard
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.device = torch.device(f'cuda:{config.device}' if torch.cuda.is_available() else 'cpu')
 
         # Directories.
         self.log_dir = config.log_dir
@@ -64,7 +64,7 @@ class Solver(object):
 
     def build_model(self):
         """Create a generator and a discriminator."""
-        self.generator = Generator(num_speakers=self.num_speakers)
+        self.generator = Generator(num_speakers=self.num_speakers, device = self.device)
         self.discriminator = Discriminator(num_speakers=self.num_speakers)
 
         self.g_optimizer = torch.optim.Adam(self.generator.parameters(), self.g_lr, [self.beta1, self.beta2])
@@ -216,9 +216,11 @@ class Solver(object):
             d_loss_fake = torch.mean(d_out_fake)
 
             # Compute loss for gradient penalty.
-            alpha = torch.rand(mc_real.size(0), 1, 1, 1).to(self.device)
-            x_hat = (alpha * mc_real.data + (1 - alpha) * mc_fake.data).requires_grad_(True)
-            d_out_src = self.discriminator(x_hat, spk_c_org, spk_c_trg)
+            #alpha = torch.rand(mc_real.size(0), 1, 1, 1).to(self.device)
+            #x_hat = (alpha * mc_real.data + (1 - alpha) * mc_fake.data).requires_grad_(True)
+            #d_out_src = self.discriminator(x_hat, spk_c_org, spk_c_trg)
+            x_hat = mc_real.requires_grad_()
+            d_out_src = self.discriminator(x_hat, spk_c_trg, spk_c_org)
             d_loss_gp = self.gradient_penalty(d_out_src, x_hat)
 
             # Backward and optimize.
