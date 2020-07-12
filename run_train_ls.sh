@@ -5,13 +5,13 @@ PYTHON=/share/mini1/sw/std/python/anaconda3-2019.07/v3.7/envs/torch_0.4/bin/pyth
 
 #$PYTHON main.py --wav_dir dump/wav16/
 
-exp=exp/0711st2ls0/
+exp=exp/0712st2ls1/
 
 
 main_script=main_st2ls.py
 
  $PYTHON $main_script \
-                    --device 0 \
+                    --device 1 \
                      --wav_dir resmp_wav22050/ \
                     --model_save_dir ${exp}/ckpt/ \
                     --sample_step 10000 \
@@ -29,5 +29,5 @@ main_script=main_st2ls.py
                     --sampling_rate 22050 \
                     --speaker_path ./speaker_used.json \
                     --batch_size 8 \
-                    #--resume_iters 70000
+                    #--resume_iters 200000
                    

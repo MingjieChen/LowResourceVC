@@ -256,8 +256,8 @@ class Solver(object):
 
                 # Backward and optimize.
 
-                #if i > 10000:
-                #    self.lambda_id = 0.
+                if i > 10000:
+                    self.lambda_id = 0.
 
                 g_loss = g_loss_fake \
                     + self.lambda_rec * g_loss_rec \

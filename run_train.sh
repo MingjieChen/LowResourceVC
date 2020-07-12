@@ -11,7 +11,7 @@ PYTHON=/share/mini1/sw/std/python/anaconda3-2019.07/v3.7/envs/torch_0.4/bin/pyth
 #exp=exp/0627stg1cin/
 #exp=exp/0629stg2_cin1/
 #exp=exp/0701stg_adain1/
-exp=exp/0711st2new1/
+exp=exp/0712st2new1/
 #exp=exp/0708st2ls0/
 
 #exp=exp/0707st2new_spkcls0/
@@ -26,7 +26,7 @@ main_script=main_st2new.py
 
  $PYTHON $main_script --wav_dir resmp_wav22050/ \
                     --model_save_dir ${exp}/ckpt/ \
-                    --device 3 \
+                    --device 2 \
                     --sample_step 10000 \
                     --model_save_step 10000\
                     --log_dir ${exp}/tb/\

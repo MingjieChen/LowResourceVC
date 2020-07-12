@@ -250,15 +250,15 @@ class PatchDiscriminator(nn.Module):
         super(PatchDiscriminator, self).__init__()
         layers = []
         layers.append(nn.Conv2d(1, conv_dim, kernel_size=4, stride=1, padding=2))
-        #layers.append(nn.LeakyReLU(0.01))
-        layers.append(GLU())
+        layers.append(nn.LeakyReLU(0.01))
+        #layers.append(GLU())
         
         curr_dim = conv_dim
         for i in range(1, repeat_num):
             layers.append(nn.Conv2d(curr_dim, curr_dim*2, kernel_size=4, stride=2, padding=1))
-            #layers.append(nn.LeakyReLU(0.01))
-            layers.append(nn.InstanceNorm2d(curr_dim*2, affine = True))
-            layers.append(GLU())
+            layers.append(nn.LeakyReLU(0.01))
+            #layers.append(nn.InstanceNorm2d(curr_dim*2, affine = True))
+            #layers.append(GLU())
             curr_dim = curr_dim * 2
 
         kernel_size_0 = int(input_size[0] / np.power(2, repeat_num)) # 1
@@ -266,13 +266,13 @@ class PatchDiscriminator(nn.Module):
         self.main = nn.Sequential(*layers)
         self.conv_dis = nn.Conv2d(curr_dim, 1, kernel_size=(kernel_size_0, kernel_size_1), stride=1, padding=0, bias=False) # padding should be 0
         #self.conv_clf_spks = nn.Conv2d(curr_dim, num_speakers, kernel_size=(kernel_size_0, kernel_size_1), stride=1, padding=0, bias=False)  # for num_speaker
-        #self.projection = nn.Linear(2*num_speakers, 1024)
-        self.projection = nn.Linear(num_speakers, curr_dim)
+        self.projection = nn.Linear(2*num_speakers, curr_dim)
+        #self.projection = nn.Linear(num_speakers, curr_dim)
         
     def forward(self, x, c_src, c_trg):
         
-        #c_onehot = torch.cat((c_src, c_trg), dim=1)
-        c_onehot = c_trg
+        c_onehot = torch.cat((c_src, c_trg), dim=1)
+        #c_onehot = c_trg
         h = self.main(x) #b 1024 h w
         p = self.projection(c_onehot) # b 1024
         assert p.size(1) == h.size(1), f"p {p.size()} h {h.size()}"

@@ -276,27 +276,26 @@ class Discriminator(nn.Module):
         # Down-sampling layers.
         self.down_sample_1 = nn.Sequential(
             nn.Conv2d(in_channels=128, out_channels=256, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False),
-            nn.InstanceNorm2d(num_features=256, affine=True),
+            nn.InstanceNorm2d(256, affine = True),
             GLU()
         )
         #self.down_sample_1 = DisDown(128, 256, kernel_size = 3, stride = 2, padding = 1)
 
         self.down_sample_2 = nn.Sequential(
             nn.Conv2d(in_channels=256, out_channels=512, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False),
-            nn.InstanceNorm2d(num_features=512, affine=True),
+            nn.InstanceNorm2d(512, affine = True),
             GLU()
         )
         #self.down_sample_2 = DisDown(256, 512, kernel_size = 3, stride = 2, padding = 1)
         
         self.down_sample_3 = nn.Sequential(
             nn.Conv2d(in_channels=512, out_channels=1024, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False),
-            nn.InstanceNorm2d(num_features=1024, affine=True),
+            nn.InstanceNorm2d(1024, affine = True),
             GLU()
         )
         #self.down_sample_3 = DisDown(512, 1024, kernel_size = 3, stride = 2, padding = 1)
         self.down_sample_4 = nn.Sequential(
             nn.Conv2d(in_channels=1024, out_channels=512, kernel_size=(1, 5), stride=(1, 1), padding=(0, 2), bias=False),
-            nn.InstanceNorm2d(num_features=512, affine=True),
             GLU()
         )
         #self.down_sample_4 = DisDown(1024, 512, kernel_size = (1,5), stride = 1, padding = (0,2))
@@ -332,8 +331,8 @@ class Discriminator(nn.Module):
         in_prod = p * h
         
         x = x.view(x.size(0), -1)
-        x = torch.cat([x ,in_prod], dim = -1)
-        
+        #x = torch.cat([x ,in_prod], dim = -1)
+        x = torch.mean(x, dim=-1) + torch.mean(in_prod, dim = -1)    
         '''
         # old dis
         x = self.fully_connected(h)
