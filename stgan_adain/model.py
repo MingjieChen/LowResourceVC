@@ -384,142 +384,72 @@ class Discriminator(nn.Module):
 
         return x
 
-class PatchCondDiscriminator(nn.Module):
-    """Discriminator network with PatchGAN."""
-    def __init__(self, input_size=(36, 256), conv_dim=128, repeat_num=5, num_speakers=10):
-        
-        super(PatchCondDiscriminator, self).__init__()
-        layers = []
-        #layers.append(nn.Conv2d(1, conv_dim, kernel_size=4, stride=2, padding=1))
-        #layers.append(nn.LeakyReLU(0.01))
-        self.first_conv = nn.Conv2d(1, conv_dim, kernel_size = 4, stride = 2, padding = 1)
-        self.first_relu = nn.LeakyReLU(0.01)
-
-        curr_dim = conv_dim
-        for i in range(1, repeat_num):
-            layers.append(nn.Conv2d(curr_dim, curr_dim*2, kernel_size=4, stride=2, padding=1))
-            layers.append(nn.LeakyReLU(0.01))
-            curr_dim = curr_dim * 2
-
-        kernel_size_0 = int(input_size[0] / np.power(2, repeat_num)) # 1
-        kernel_size_1 = int(input_size[1] / np.power(2, repeat_num)) # 8
-        self.main = nn.Sequential(*layers)
-        self.conv_dis = nn.Conv2d(curr_dim, 1, kernel_size=(kernel_size_0, kernel_size_1), stride=1, padding=0, bias=False) # padding should be 0
-        #self.conv_clf_spks = nn.Conv2d(curr_dim, num_speakers, kernel_size=(kernel_size_0, kernel_size_1), stride=1, padding=0, bias=False)  # for num_speaker
-        #self.projection = nn.Linear(2*128, 1024)
-        #self.projection = nn.Linear(128, 64)
-        
-    def forward(self, x, c_src, c_trg):
-        '''
-            x: shape [b, 1, 36, 256]
-            c: shape [b, 128]
-        '''
-        
-
-
-        #c_onehot = torch.cat((c_src, c_trg), dim=1)
-        c_cond = c_trg
-        
-        h = self.first_conv(x)
-        h = self.first_relu(h)
-        
-        # concat
-        
-        h = h + c_cond.unsqueeze(2).unsqueeze(3)
-        
-
-        h = self.main(h) #b 1024 h w
-        #p = self.projection(c_onehot) # b 1024
-        #assert p.size(1) == h.size(1), f"p {p.size()} h {h.size()}"
-        #h = h * p.unsqueeze(2).unsqueeze(3)
-        out_src = self.conv_dis(h)
-        return out_src
 class PatchDiscriminator(nn.Module):
     """Discriminator network with PatchGAN."""
-    def __init__(self, input_size=(36, 256), conv_dim=128, repeat_num=4, num_speakers=10):
-        
+    def __init__(self, num_speakers=10):
         super(PatchDiscriminator, self).__init__()
-        layers = []
-        layers.append(nn.Conv2d(1, conv_dim, kernel_size=4, stride=2, padding=1))
-        layers.append(nn.LeakyReLU(0.01))
 
-        curr_dim = conv_dim
-        for i in range(1, repeat_num):
-            layers.append(nn.Conv2d(curr_dim, curr_dim*2, kernel_size=4, stride=2, padding=1))
-            layers.append(nn.LeakyReLU(0.01))
-            curr_dim = curr_dim * 2
+        self.num_speakers = num_speakers
+        # Initial layers.
+        self.conv_layer_1 = nn.Sequential(
+            nn.Conv2d(in_channels=1, out_channels=128, kernel_size=(3, 3), stride=(1, 1), padding=1),
+            GLU()
+        )
+        #self.conv1 = nn.Conv2d(1, 128, kernel_size= (3,3), stride = 1, padding= 1)
+        #self.gate1 = nn.Conv2d(1, 128, kernel_size = 3, stride = 1, padding = 1)
 
-        kernel_size_0 = int(input_size[0] / np.power(2, repeat_num)) # 1
-        kernel_size_1 = int(input_size[1] / np.power(2, repeat_num)) # 8
-        self.main = nn.Sequential(*layers)
-        self.conv_dis = nn.Conv2d(curr_dim, 1, kernel_size=(kernel_size_0, kernel_size_1), stride=1, padding=0, bias=False) # padding should be 0
-        #self.conv_clf_spks = nn.Conv2d(curr_dim, num_speakers, kernel_size=(kernel_size_0, kernel_size_1), stride=1, padding=0, bias=False)  # for num_speaker
-        #self.projection = nn.Linear(2*128, 1024)
-        #self.projection = nn.Linear(128, curr_dim)
+        # Down-sampling layers.
+        self.down_sample_1 = nn.Sequential(
+            nn.Conv2d(in_channels=128, out_channels=256, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False),
+            nn.InstanceNorm2d(256, affine = True),
+            GLU()
+        )
+        #self.down_sample_1 = DisDown(128, 256, kernel_size = 3, stride = 2, padding = 1)
+
+        self.down_sample_2 = nn.Sequential(
+            nn.Conv2d(in_channels=256, out_channels=512, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False),
+            nn.InstanceNorm2d(512, affine = True),
+            GLU()
+        )
+        #self.down_sample_2 = DisDown(256, 512, kernel_size = 3, stride = 2, padding = 1)
         
-    def forward(self, x, c_src, c_trg):
+        self.down_sample_3 = nn.Sequential(
+            nn.Conv2d(in_channels=512, out_channels=1024, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False),
+            nn.InstanceNorm2d(1024, affine = True),
+            GLU()
+        )
+        #self.down_sample_3 = DisDown(512, 1024, kernel_size = 3, stride = 2, padding = 1)
+        self.down_sample_4 = nn.Sequential(
+            nn.Conv2d(in_channels=1024, out_channels=512, kernel_size=(1, 5), stride=(1, 1), padding=(0, 2), bias=False),
+            GLU()
+        )
         
-        #c_onehot = torch.cat((c_src, c_trg), dim=1)
-        #c_onehot = c_trg
-        h = self.main(x) #b 1024 h w
-        #p = self.projection(c_onehot) # b 1024
-        #assert p.size(1) == h.size(1), f"p {p.size()} h {h.size()}"
-        #h = h + p.unsqueeze(2).unsqueeze(3)
-        out_src = self.conv_dis(h)
-        return out_src
+        self.dis_conv = nn.Conv2d(512, num_speakers, kernel_size = 1, stride = 1, padding = 0, bias = False )
+
+    def forward(self, x, c, c_):
+        #c_onehot = torch.cat((c, c_), dim=1)
+        #c_onehot = c_
+
+        x = self.conv_layer_1(x)
+        #x_conv = self.conv1(x)
+        #x_gate = self.gate1(x)
+        #out = x_conv * torch.sigmoid(x_gate)
+
+        x = self.down_sample_1(x)
+        x = self.down_sample_2(x)
+        x = self.down_sample_3(x)
+        x = self.down_sample_4(x)
+        
+        x = self.dis_conv(x)
+
+        b, c, h, w = x.size()
+        x = x.view(b,c, h*w)
+        x = torch.mean(x, dim = 2)
+
+        idx = torch.LongTensor(range(x.size(0))).to(x.device)
+
+        x = x[idx, c_.long()]
+
+        return x
 
 
-# Just for testing shapes of architecture.
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Test G and D architecture')
-
-    train_dir_default = '../data/VCTK-Data/mc/train'
-    speaker_default = 'p229'
-
-    # Data config.
-    parser.add_argument('--train_dir', type=str, default=train_dir_default, help='Train dir path')
-    parser.add_argument('--speakers', type=str, nargs='+', required=True, help='Speaker dir names')
-    num_speakers = 4
-
-    argv = parser.parse_args()
-    train_dir = argv.train_dir
-    speakers_using = argv.speakers
-
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-    # Load models
-    generator = Generator(num_speakers=num_speakers).to(device)
-    discriminator = Discriminator(num_speakers=num_speakers).to(device)
-
-    # Load data
-    train_loader = get_loader(speakers_using, train_dir, 8, 'train', num_workers=1)
-    data_iter = iter(train_loader)
-
-    mc_real, spk_label_org, spk_c_org = next(data_iter)
-    mc_real.unsqueeze_(1)  # (B, D, T) -> (B, 1, D, T) for conv2d
-
-    spk_c = np.random.randint(0, num_speakers, size=mc_real.size(0))
-    spk_c_cat = to_categorical(spk_c, num_speakers)
-    spk_label_trg = torch.LongTensor(spk_c)
-    spk_c_trg = torch.FloatTensor(spk_c_cat)
-
-    mc_real = mc_real.to(device)              # Input mc.
-    spk_label_org = spk_label_org.to(device)  # Original spk labels.
-    spk_c_org = spk_c_org.to(device)          # Original spk acc conditioning.
-    spk_label_trg = spk_label_trg.to(device)  # Target spk labels for classification loss for G.
-    spk_c_trg = spk_c_trg.to(device)          # Target spk conditioning.
-
-    print('------------------------')
-    print('Testing Discriminator')
-    print('-------------------------')
-    print(f'Shape in: {mc_real.shape}')
-    dis_real = discriminator(mc_real, spk_c_org, spk_c_trg)
-    print(f'Shape out: {dis_real.shape}')
-    print('------------------------')
-
-    print('Testing Generator')
-    print('-------------------------')
-    print(f'Shape in: {mc_real.shape}')
-    mc_fake = generator(mc_real, spk_c_trg)
-    print(f'Shape out: {mc_fake.shape}')
-    print('------------------------')

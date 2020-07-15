@@ -6,7 +6,7 @@ PYTHON=/share/mini1/sw/std/python/anaconda3-2019.07/v3.7/envs/torch_0.4/bin/pyth
 #$PYTHON main.py --wav_dir dump/wav16/
 
 #exp=exp/0705stada_doub0/
-exp=exp/0715stadain0/
+exp=exp/0715stadain1/
 main_script=main_stgan_adain.py
 #main_script=main_stadain_doubdis.py
 $PYTHON $main_script \

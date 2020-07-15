@@ -1,7 +1,7 @@
 from stgan_adain.model import Generator
-#from stgan_adain.model import PatchDiscriminator as Discriminator
+from stgan_adain.model import PatchDiscriminator as Discriminator
 #from stgan_adain.model import PatchCondDiscriminator as Discriminator
-from stgan_adain.model import Discriminator
+#from stgan_adain.model import Discriminator
 from stgan_adain.model import SPEncoder
 import torch
 import torch.nn.functional as F
