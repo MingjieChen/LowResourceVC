@@ -4,9 +4,9 @@ exp/
 resmp*/
 dataset/
 dump/
-stgan_adain/
+# stgan_adain/
 submit*.sh
-main_stgan_adain.py
+# main_stgan_adain.py
 pair_list.txt
 run_train_adain.sh
 main_stadain_doubdis.py

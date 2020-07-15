@@ -11,7 +11,7 @@ exp=exp/0712st2ls1/
 main_script=main_st2ls.py
 
  $PYTHON $main_script \
-                    --device 1 \
+                    --device 0 \
                      --wav_dir resmp_wav22050/ \
                     --model_save_dir ${exp}/ckpt/ \
                     --sample_step 10000 \
@@ -29,5 +29,5 @@ main_script=main_st2ls.py
                     --sampling_rate 22050 \
                     --speaker_path ./speaker_used.json \
                     --batch_size 8 \
-                    #--resume_iters 200000
+                    --resume_iters 130000
                    

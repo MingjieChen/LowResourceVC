@@ -109,13 +109,18 @@ class PairDataset(data.Dataset):
         src_mc = self.sample_seg(src_mc)
         src_mc = np.transpose(src_mc, (1, 0))  # (T, D) -> (D, T), since pytorch need feature having shape
         
+        src_spk_id = self.speakers.index(src_spk)
+        src_spk_cat = np.squeeze(to_categorical([src_spk_id], num_classes=len(self.speakers)))
+
         # choose another spk
         speakers =self.speakers[:]
         speakers.remove(src_spk)
         trg_spk_index = np.random.randint(0, 2)
         
         trg_spk = speakers[trg_spk_index]
-        
+        trg_spk_id = self.speakers.index(trg_spk)
+        trg_spk_cat = np.squeeze(to_categorical([trg_spk_id], num_classes=len(self.speakers)))
+
         # choose a trg file
         trg_spk_files = self.spk2files[trg_spk]
         trg_file_index = np.random.randint(0, len(trg_spk_files))
@@ -127,7 +132,7 @@ class PairDataset(data.Dataset):
         trg_mc = self.sample_seg(trg_mc)
         trg_mc = np.transpose(trg_mc, (1, 0))  # (T, D) -> (D, T), since pytorch need feature having shape
 
-        return torch.FloatTensor(src_mc), torch.FloatTensor(trg_mc)
+        return torch.FloatTensor(src_mc), torch.LongTensor([src_spk_id]).squeeze_(), torch.FloatTensor(src_spk_cat), torch.FloatTensor(trg_mc), torch.LongTensor([trg_spk_id]).squeeze_(), torch.FloatTensor(trg_spk_cat)
 
 class CycDataset(data.Dataset):
     '''dataset for cycle gan training, fix src spk and trg spk'''
@@ -274,6 +279,14 @@ class PairTestDataset(object):
         self.mcep_std_trg = self.trg_spk_stats['coded_sps_std']
         
         self.src_wav_dir = f'{wav_dir}/eval/{src_spk}'
+        
+        self.spk_idx = speakers.index(trg_spk)
+        spk_cat = to_categorical([self.spk_idx], num_classes=len(speakers))
+        self.spk_c_trg = spk_cat
+        
+        self.src_spk_idx = speakers.index(src_spk)
+        spk_cat = to_categorical([self.src_spk_idx], num_classes=len(speakers))
+        self.spk_c_src = spk_cat
 
     def get_batch_test_data(self, batch_size=8):
         batch_data = []

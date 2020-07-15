@@ -64,7 +64,7 @@ class Upsample1DBlock(nn.Module):
         #out = self.conv(x) * torch.sigmoid(self.gates(x))
 
 
-        return out 
+        return out  
 
 
 class Downsample1DBlock(nn.Module):
@@ -98,9 +98,12 @@ class ResidualBlock(nn.Module):
     """Residual Block with instance normalization."""
     def __init__(self, dim_in, dim_out):
         super(ResidualBlock, self).__init__()
-        self.conv = nn.Conv1d(dim_in, dim_out, kernel_size=3, stride=1, padding=1, bias=False)
-        self.inst_norm = nn.InstanceNorm1d(dim_out, affine = True)
+        self.conv1 = nn.Conv1d(dim_in, dim_out, kernel_size=3, stride=1, padding=1, bias=False)
+        self.inst_norm1 = nn.InstanceNorm1d(dim_out, affine = True)
         self.glu = GLU()
+
+        self.conv2 = nn.Conv1d(dim_out, dim_in, kernel_size = 3, stride = 1, padding= 1, bias = False)
+        self.inst_norm2 = nn.InstanceNorm1d(dim_in, affine = True)
         '''
         self.conv = nn.Sequential(
             nn.Conv1d(dim_in, dim_out, kernel_size = 3, stride = 1, padding = 1),
@@ -117,8 +120,10 @@ class ResidualBlock(nn.Module):
         '''
 
     def forward(self, x):
-        x_ = self.conv(x)
-        x_ = self.inst_norm(x_)
+        x_ = self.conv1(x)
+        x_ = self.inst_norm1(x_)
+        x_ = self.conv2(x_)
+        x_ = self.inst_norm2(x_)
         x_ = self.glu(x_)
         '''
         h1_norm = self.conv(x)
@@ -130,7 +135,7 @@ class ResidualBlock(nn.Module):
 
         return x + h2_norm
         '''    
-        return x_
+        return x_ + x
 
 
 class Generator(nn.Module):
@@ -149,17 +154,17 @@ class Generator(nn.Module):
         # Downsample
 
         layers.append(Downsample1DBlock(128, 256, 5, 2, 1))
-        layers.append(Downsample1DBlock(256, 256, 5, 2, 2))
+        layers.append(Downsample1DBlock(256, 512, 5, 2, 2))
 
         # Bottleneck layers
 
         for _ in range(repeat_num):
-            layers.append(ResidualBlock(256, 256))
+            layers.append(ResidualBlock(512, 1024))
         
         # Upsample
         
-        layers.append(Upsample1DBlock(256, 512, 5, 1, 2))
-        layers.append(Upsample1DBlock(256, 256, 5, 1, 2))
+        layers.append(Upsample1DBlock(512, 1024, 5, 1, 2))
+        layers.append(Upsample1DBlock(512, 256, 5, 1, 2))
         
         layers.append(nn.Conv1d(128, input_dim, kernel_size = 15, stride = 1, padding = 7))
         
@@ -196,7 +201,7 @@ class Discriminator(nn.Module):
         super(Discriminator, self).__init__()
         layers = []
         
-        layers.append(nn.Conv2d(1,128, kernel_size = [3,4], stride = [1,2], padding = 1))
+        layers.append(nn.Conv2d(1,128, kernel_size = [3,3], stride = [2,1], padding = 1))
         layers.append(GLU())
         #self.conv1 = nn.Conv2d(1, 128, kernel_size = [3,3], stride = [1,2], padding = [1,1])
         #self.gates1 = nn.Conv2d(1, 128, kernel_size = [3,3], stride = [1,2], padding = [1,1])
@@ -210,10 +215,10 @@ class Discriminator(nn.Module):
         #self.down1 = DisDownsample(128, 256, kernel_size = [3,3], stride = 2, padding = [1,1])
         #self.down2 = DisDownsample(256, 512, kernel_size = [3,3], stride = 2, padding = [1,1])
         #self.down3 = DisDownsample(512, 1024, kernel_size = [6,3], stride = [1,2], padding = [3,2])
-        self.conv_dis = nn.Conv2d(curr_dim, 1, kernel_size=[2,4],  stride=1, padding=0, bias=False)
+        #self.conv_dis = nn.Conv2d(curr_dim, 1, kernel_size=[2,4],  stride=1, padding=0, bias=False)
 
         self.main = nn.Sequential(*layers)
-        self.out_linear = nn.Linear(1024, 1)
+        self.out_linear = nn.Linear(curr_dim, 1)
         
     def forward(self, x):
         x = x.unsqueeze(1) # b 1 36 256
@@ -226,8 +231,8 @@ class Discriminator(nn.Module):
         #out = self.down3(out)
         
         #out_src = self.out_linear(out.permute(0,2,3,1))
-        out_src = self.conv_dis(h)
-        #out_src = self.out_linear(h.permute(0,2,3,1))
+        #out_src = self.conv_dis(h)
+        out_src = self.out_linear(h.permute(0,2,3,1))
         #out_src = torch.sigmoid(out_src)
         #out_cls_spks = self.conv_clf_spks(h)
         return out_src #out_cls_spks.view(out_cls_spks.size(0), out_cls_spks.size(1))
