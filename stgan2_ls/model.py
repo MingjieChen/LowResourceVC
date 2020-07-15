@@ -7,11 +7,9 @@ from data_loader import get_loader, to_categorical
 
 class ConditionalInstanceNormalisation(nn.Module):
     """CIN Block."""
-    def __init__(self, dim_in, style_num, device):
+    def __init__(self, dim_in, style_num):
         super(ConditionalInstanceNormalisation, self).__init__()
 
-        #self.device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
-        self.device = device
 
         self.dim_in = dim_in
         self.style_num = style_num
@@ -26,11 +24,11 @@ class ConditionalInstanceNormalisation(nn.Module):
         std = torch.sqrt(var + 1e-8)
 
         # width = x.shape[2]
-        c = torch.cat([c_src, c_trg], dim = -1)
+        c = torch.cat([c_src, c_trg], dim = -1).to(x.device)
         #c = c_trg
-        gamma = self.gamma(c.to(self.device))
+        gamma = self.gamma(c)
         gamma = gamma.view(-1, self.dim_in, 1)
-        beta = self.beta(c.to(self.device))
+        beta = self.beta(c)
         beta = beta.view(-1, self.dim_in, 1)
 
         h = (x - u) / std
@@ -88,10 +86,10 @@ class GLU(nn.Module):
 
 class ResidualBlock(nn.Module):
     """Residual Block with instance normalization."""
-    def __init__(self, dim_in, dim_out, style_num, device):
+    def __init__(self, dim_in, dim_out, style_num):
         super(ResidualBlock, self).__init__()
         self.conv_1 = nn.Conv1d(dim_in, dim_out, kernel_size=3, stride=1, padding=1, bias = False)
-        self.cin_1 = ConditionalInstanceNormalisation(dim_out, style_num, device)
+        self.cin_1 = ConditionalInstanceNormalisation(dim_out, style_num)
         self.relu_1 = GLU()
 
         
@@ -118,9 +116,9 @@ class ResidualBlock(nn.Module):
 
 class Generator(nn.Module):
     """Generator network."""
-    def __init__(self, device, num_speakers=4):
+    def __init__(self, num_speakers=4, device = None):
         super(Generator, self).__init__()
-        self.device = device
+        #self.device = device
         # Down-sampling layers
         self.down_sample_1 = nn.Sequential(
             nn.Conv2d(in_channels=1, out_channels=128, kernel_size=(3, 9), padding=(1, 4), bias=False),
@@ -159,15 +157,15 @@ class Generator(nn.Module):
         )
 
         # Bottleneck layers.
-        self.residual_1 = ResidualBlock(dim_in=256, dim_out=256, style_num=num_speakers, device = self.device)
-        self.residual_2 = ResidualBlock(dim_in=256, dim_out=256, style_num=num_speakers, device = self.device)
-        self.residual_3 = ResidualBlock(dim_in=256, dim_out=256, style_num=num_speakers, device = self.device)
-        self.residual_4 = ResidualBlock(dim_in=256, dim_out=256, style_num=num_speakers, device = self.device)
-        self.residual_5 = ResidualBlock(dim_in=256, dim_out=256, style_num=num_speakers, device = self.device)
-        self.residual_6 = ResidualBlock(dim_in=256, dim_out=256, style_num=num_speakers, device = self.device)
-        self.residual_7 = ResidualBlock(dim_in=256, dim_out=256, style_num=num_speakers, device = self.device)
-        self.residual_8 = ResidualBlock(dim_in=256, dim_out=256, style_num=num_speakers, device = self.device)
-        self.residual_9 = ResidualBlock(dim_in=256, dim_out=256, style_num=num_speakers, device = self.device)
+        self.residual_1 = ResidualBlock(dim_in=256, dim_out=256, style_num=num_speakers)
+        self.residual_2 = ResidualBlock(dim_in=256, dim_out=256, style_num=num_speakers)
+        self.residual_3 = ResidualBlock(dim_in=256, dim_out=256, style_num=num_speakers)
+        self.residual_4 = ResidualBlock(dim_in=256, dim_out=256, style_num=num_speakers)
+        self.residual_5 = ResidualBlock(dim_in=256, dim_out=256, style_num=num_speakers)
+        self.residual_6 = ResidualBlock(dim_in=256, dim_out=256, style_num=num_speakers)
+        self.residual_7 = ResidualBlock(dim_in=256, dim_out=256, style_num=num_speakers)
+        self.residual_8 = ResidualBlock(dim_in=256, dim_out=256, style_num=num_speakers)
+        self.residual_9 = ResidualBlock(dim_in=256, dim_out=256, style_num=num_speakers)
 
         # Up-conversion layers.
         self.up_conversion = nn.Conv1d(in_channels=256,

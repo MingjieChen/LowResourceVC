@@ -1,7 +1,10 @@
 import argparse
-from stgan2_new.model import Generator
+#from stgan2_new.model import Generator
 #from stgan.model import Generator
 #from model2 import Generator as Generator2
+from stgan2_ls.model import Generator as LSGen
+from stgan_adain.model import Generator as AdaGen
+from stgan_adain.model import SPEncoder as SPEncoder
 from torch.autograd import Variable
 import torch
 import torch.nn.functional as F
@@ -74,6 +77,10 @@ class TestDataset(object):
         self.spk_idx = speakers.index(self.trg_spk)
         spk_cat = to_categorical([self.spk_idx], num_classes=len(speakers))
         self.spk_c_trg = spk_cat
+        
+        self.org_idx = speakers.index(self.src_spk)
+        org_cat = to_categorical([self.org_idx], num_classes = len(speakers))
+        self.spk_c_org = org_cat
 
 
     def get_batch_test_data(self, batch_size=4):
@@ -99,12 +106,12 @@ def load_wav(wavfile, sr=16000):
     # return wav
 
 
-def process_test_loader(test_loader, G, device, sampling_rate, num_mcep, frame_period, config):
+def process_test_loader(test_loader, G, device, sampling_rate, num_mcep, frame_period, config, sp_enc):
     test_wavfiles = test_loader.get_batch_test_data(batch_size=config.num_converted_wavs)
-    test_wavs = [(load_wav(wavfile, sampling_rate), ref_wav) for wavfile, ref_wav in test_wavfiles]
+    test_wavs = [(load_wav(wavfile, sampling_rate), ref_wav, load_wav(ref_wav, sampling_rate) ) for wavfile, ref_wav in test_wavfiles]
     pair_list = []
     with torch.no_grad():
-        for idx, (wav, ref)  in enumerate(test_wavs):
+        for idx, (wav, ref, ref_wav)  in enumerate(test_wavs):
             print(len(wav))
             wav_name = basename(test_wavfiles[idx][0])
             
@@ -116,16 +123,33 @@ def process_test_loader(test_loader, G, device, sampling_rate, num_mcep, frame_p
                 mean_log_src=test_loader.logf0s_mean_src, std_log_src=test_loader.logf0s_std_src, 
                 mean_log_target=test_loader.logf0s_mean_trg, std_log_target=test_loader.logf0s_std_trg)
             coded_sp = world_encode_spectral_envelop(sp=sp, fs=sampling_rate, dim=num_mcep)
+            
             print("Before being fed into G: ", coded_sp.shape)
             coded_sp_norm = (coded_sp - test_loader.mcep_mean_src) / test_loader.mcep_std_src
             coded_sp_norm_tensor = torch.FloatTensor(coded_sp_norm.T).unsqueeze_(0).unsqueeze_(1).to(device)
-            spk_conds = torch.FloatTensor(test_loader.spk_c_trg).to(device)
-            # print(spk_conds.size())
             
-            coded_sp_converted_norm = G(coded_sp_norm_tensor, spk_conds, spk_conds).data.cpu().numpy()
+            trg_spk_cat = torch.FloatTensor(test_loader.spk_c_trg).to(device)
+            if sp_enc is not None:
+                _, _, ref_sp, _ = world_decompose(wav = ref_wav, fs = sampling_rate, frame_period = frame_period)
+                coded_ref_sp = world_encode_spectral_envelop(sp = ref_sp, fs = sampling_rate, dim = num_mcep)
+                coded_ref_sp_norm = (coded_ref_sp - test_loader.mcep_mean_trg) / test_loader.mcep_std_trg
+                coded_ref_sp_norm_tensor = torch.FloatTensor(coded_ref_sp_norm.T).unsqueeze_(0).unsqueeze_(1).to(device)
+                
+                trg_spk_label = torch.LongTensor([test_loader.spk_idx]).to(device)           
+                trg_spk_cond = sp_enc(coded_ref_sp_norm_tensor, trg_spk_label)    
+            org_spk_cat = torch.FloatTensor(test_loader.spk_c_org).to(device)
+            #org_spk_label = torch.LongTensor([test_loader.org_idx]).to(device)           
             
+            if sp_enc is not None:
+                coded_sp_converted_norm = G(coded_sp_norm_tensor, trg_spk_cond, trg_spk_cond).data.cpu().numpy()
+            else:
+                coded_sp_converted_norm = G(coded_sp_norm_tensor, org_spk_cat, trg_spk_cat).data.cpu().numpy()
+
+
             coded_sp_converted = np.squeeze(coded_sp_converted_norm).T * test_loader.mcep_std_trg + test_loader.mcep_mean_trg
             coded_sp_converted = np.ascontiguousarray(coded_sp_converted)
+            
+            
             print("After being fed into G: ", coded_sp_converted.shape)
             #synthesis to converted wav
             wav_transformed = world_speech_synthesis(f0=f0_converted, coded_sp=coded_sp_converted, 
@@ -164,6 +188,12 @@ def test(config):
     G_path = join(config.model_save_dir, f'{config.resume_iters}-G.ckpt')
     G.load_state_dict(torch.load(G_path, map_location=lambda storage, loc: storage))
     
+    if config.generator == 'AdaGen':
+        sp_enc = SPEncoder(num_speakers = config.num_speakers).to(device)
+        sp_path = join(config.model_save_dir, f'{config.resume_iters}-sp.ckpt')
+        sp_enc.load_state_dict(torch.load(sp_path, map_location=lambda storage, loc: storage))
+    else:
+        sp_enc = None
     
     
     all_pair_list = []
@@ -178,7 +208,7 @@ def test(config):
                 if src != trg:
                     
                     test_loader = TestDataset(config, src_spk = src, trg_spk = trg, speakers = speakers)
-                    pair_list = process_test_loader(test_loader, G, device, sampling_rate, num_mcep, frame_period, config)
+                    pair_list = process_test_loader(test_loader, G, device, sampling_rate, num_mcep, frame_period, config, sp_enc)
                     all_pair_list.extend(pair_list)
     
     with open(config.pair_list_path,'w') as f:
