@@ -66,7 +66,7 @@ class PairDataset(data.Dataset):
             if spk not in self.spk2files:
                 self.spk2files[spk] = []
             
-            _spk_files = glob.glob(join(data_dir, spk, '*.npy'))
+            _spk_files = glob.glob(join(data_dir, f'{spk}*.npy'))
             mc_files = self.rm_too_short_utt(_spk_files, min_length)
             
             self.spk2files[spk].extend(mc_files)
@@ -145,8 +145,8 @@ class CycDataset(data.Dataset):
         self.src_spk = src_spk
         self.trg_spk = trg_spk
 
-        src_mc_files = glob.glob(join(data_dir, self.src_spk, '*.npy'))
-        trg_mc_files = glob.glob(join(data_dir, self.trg_spk, '*.npy'))
+        src_mc_files = glob.glob(join(data_dir, f'{self.src_spk}_*.npy'))
+        trg_mc_files = glob.glob(join(data_dir, f'{self.trg_spk}_*.npy'))
 
         self.src_mc_files = self.rm_too_short_utt(src_mc_files, min_length)
         self.src_num_files = len(self.src_mc_files)
@@ -208,7 +208,7 @@ class MyDataset(data.Dataset):
         self.speakers = speakers[:]
         mc_files = []
         for spk in self.speakers:
-            mc_files.extend(glob.glob(join(data_dir, spk, '*.npy')))
+            mc_files.extend(glob.glob(join(data_dir, f'{spk}_*.npy')))
         #mc_files = glob.glob(join(data_dir, '*.npy'))
         #mc_files = [i for i in mc_files if basename(i)[:4] in speakers] 
         
@@ -241,8 +241,8 @@ class MyDataset(data.Dataset):
 
     def __getitem__(self, index):
         filename = self.mc_files[index]
-        #spk = basename(filename).split('_')[0]
-        spk = basename(dirname(filename))
+        spk = basename(filename).split('_')[0]
+        #spk = basename(dirname(filename))
         if spk not in self.speakers:
             raise Exception(f"speaker {spk} not in self.speakers {self.speakers}")
         spk_idx = self.speakers.index(spk)
@@ -263,11 +263,11 @@ class PairTestDataset(object):
         self.src_spk = src_spk
         self.trg_spk = trg_spk
 
-        self.mc_files = sorted(glob.glob(join(data_dir, self.src_spk, '*.npy')))
-        self.trg_mc_files = sorted(glob.glob(join(data_dir, self.trg_spk, '*.npy')))
+        self.mc_files = sorted(glob.glob(join(data_dir, f'{self.src_spk}_*.npy')))
+        self.trg_mc_files = sorted(glob.glob(join(data_dir, f'{self.trg_spk}_*.npy')))
 
-        self.src_spk_stats = np.load(join(data_dir.replace('eval', 'train'), '{}_stats.npz'.format(src_spk)))
-        self.trg_spk_stats = np.load(join(data_dir.replace('eval', 'train'), '{}_stats.npz'.format(trg_spk)))
+        self.src_spk_stats = np.load(join(data_dir.replace('test', 'train'), '{}_stats.npz'.format(src_spk)))
+        self.trg_spk_stats = np.load(join(data_dir.replace('test', 'train'), '{}_stats.npz'.format(trg_spk)))
 
         self.logf0s_mean_src = self.src_spk_stats['log_f0s_mean']
         self.logf0s_std_src = self.src_spk_stats['log_f0s_std']
@@ -278,7 +278,7 @@ class PairTestDataset(object):
         self.mcep_mean_trg = self.trg_spk_stats['coded_sps_mean']
         self.mcep_std_trg = self.trg_spk_stats['coded_sps_std']
         
-        self.src_wav_dir = f'{wav_dir}/eval/{src_spk}'
+        self.src_wav_dir = f'{wav_dir}/{src_spk}'
         
         self.spk_idx = speakers.index(trg_spk)
         spk_cat = to_categorical([self.spk_idx], num_classes=len(speakers))
@@ -307,10 +307,10 @@ class TestDataset(object):
     def __init__(self, data_dir, wav_dir, speakers, src_spk='p262', trg_spk='p272'):
         self.src_spk = src_spk
         self.trg_spk = trg_spk
-        self.mc_files = sorted(glob.glob(join(data_dir, self.src_spk, '*.npy')))
+        self.mc_files = sorted(glob.glob(join(data_dir,f'{self.src_spk}_*.npy')))
 
-        self.src_spk_stats = np.load(join(data_dir.replace('eval', 'train'), '{}_stats.npz'.format(src_spk)))
-        self.trg_spk_stats = np.load(join(data_dir.replace('eval', 'train'), '{}_stats.npz'.format(trg_spk)))
+        self.src_spk_stats = np.load(join(data_dir.replace('test', 'train'), '{}_stats.npz'.format(src_spk)))
+        self.trg_spk_stats = np.load(join(data_dir.replace('test', 'train'), '{}_stats.npz'.format(trg_spk)))
         
         self.logf0s_mean_src = self.src_spk_stats['log_f0s_mean']
         self.logf0s_std_src = self.src_spk_stats['log_f0s_std']
@@ -320,7 +320,7 @@ class TestDataset(object):
         self.mcep_std_src = self.src_spk_stats['coded_sps_std']
         self.mcep_mean_trg = self.trg_spk_stats['coded_sps_mean']
         self.mcep_std_trg = self.trg_spk_stats['coded_sps_std']
-        self.src_wav_dir = f'{wav_dir}/eval/{src_spk}'
+        self.src_wav_dir = f'{wav_dir}/{src_spk}'
         self.spk_idx = speakers.index(trg_spk)
         spk_cat = to_categorical([self.spk_idx], num_classes=len(speakers))
         self.spk_c_trg = spk_cat

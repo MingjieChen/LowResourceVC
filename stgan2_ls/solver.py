@@ -27,6 +27,7 @@ class Solver(object):
         self.lambda_rec = config.lambda_rec
         self.lambda_gp = config.lambda_gp
         self.lambda_id = config.lambda_id
+        self.drop_id_step = config.drop_id_step
 
         # Training configurations.
         self.batch_size = config.batch_size
@@ -256,7 +257,7 @@ class Solver(object):
 
                 # Backward and optimize.
 
-                if i > 10000:
+                if i > self.drop_id_step:
                     self.lambda_id = 0.
 
                 g_loss = g_loss_fake \

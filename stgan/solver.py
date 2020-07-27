@@ -159,7 +159,7 @@ class Solver(object):
         data_iter = iter(train_loader)
 
         # Read a batch of testdata
-        test_wavfiles = self.test_loader.get_batch_test_data(batch_size=4)
+        test_wavfiles = self.test_loader.get_batch_test_data(batch_size=6)
         test_wavs = [self.load_wav(wavfile, sr = self.sampling_rate) for wavfile in test_wavfiles]
 
         # Determine whether do copysynthesize when first do training-time conversion test.

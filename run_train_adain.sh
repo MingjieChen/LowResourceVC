@@ -6,20 +6,30 @@ PYTHON=/share/mini1/sw/std/python/anaconda3-2019.07/v3.7/envs/torch_0.4/bin/pyth
 #$PYTHON main.py --wav_dir dump/wav16/
 
 #exp=exp/0705stada_doub0/
-exp=exp/0715stadain1/
-main_script=main_stgan_adain.py
+root=/share/mini1/res/t/vc/studio/timap-en/vctk/
+wav_dir=$root/resmp_wav22050/
+mc_dir=$root/dump/0721mc_10spk_22050/
+
+exp_root=/share/mini1/res/t/vc/studio/timap-en/vctk/exp/vc-gan/
+exp_name=0722stgan3_0/
+exp=$exp_root/$exp_name
+
+
+main_script=$root/vc-gan/main_stgan_adain.py
+#exp=exp/0715stadain1/
+#main_script=main_stgan_adain.py
 #main_script=main_stadain_doubdis.py
 $PYTHON $main_script \
                     --device 1\
-                    --wav_dir resmp_wav22050/ \
+                    --wav_dir $wav_dir \
                     --model_save_dir ${exp}/ckpt/ \
                     --sample_step 10000 \
                     --model_save_step 10000\
                     --log_dir ${exp}/tb/\
-                    --num_speakers 4 \
-                    --train_data_dir dump/mc/train/ \
-                    --test_data_dir dump/mc/eval/ \
-                    --sample_dir ./samples/$exp/ \
+                    --num_speakers 10 \
+                    --train_data_dir $mc_dir/train \
+                    --test_data_dir $mc_dir/test \
+                    --sample_dir $exp/samples/ \
                     --num_workers 8 \
                     --n_critic 1\
                     --g_lr 0.0002\
@@ -28,10 +38,10 @@ $PYTHON $main_script \
                     --lambda_adv 1.0 \
                     --lambda_spid 1.0 \
                     --min_length 256 \
-                    --test_src_spk VCC2SF1 \
-                    --test_trg_spk VCC2SM1 \
+                    --test_src_spk p272 \
+                    --test_trg_spk p262 \
                     --sampling_rate 22050 \
-                    --speaker_path ./speaker_used.json \
+                    --speaker_path $mc_dir/speaker_used.json \
                     --batch_size 8 \
-                    #--resume_iters 110000
+                    --resume_iters 110000
                    

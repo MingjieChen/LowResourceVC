@@ -48,6 +48,7 @@ if __name__ == '__main__':
     parser.add_argument('--lambda_cls', type=float, default=1, help='weight for domain classification loss')
     parser.add_argument('--lambda_rec', type=float, default=10, help='weight for reconstruction loss')
     parser.add_argument('--lambda_gp', type=float, default=10, help='weight for gradient penalty')
+    parser.add_argument('--drop_id_step', type=int, default=500000, help='steps dropping id mapping loss')
     parser.add_argument('--sampling_rate', type=int, default=16000, help='sampling rate')
     
     # Training configuration.

@@ -2,6 +2,7 @@ import argparse
 #from stgan2_new.model import Generator
 #from stgan.model import Generator
 #from model2 import Generator as Generator2
+from stgan.model import Generator as Gen
 from stgan2_ls.model import Generator as LSGen
 from stgan_adain.model import Generator as AdaGen
 from stgan_adain.model import SPEncoder as SPEncoder
@@ -55,10 +56,10 @@ class TestDataset(object):
             self.src_spk = src_spk
             self.trg_spk = trg_spk
         
-        print(f" ==== create test dataloader for src {self.src_spk} and trg {self.trg_spk} ====")
+        print(f" ==== create test dataloader for src {self.src_spk} and trg {self.trg_spk} ====", flush=True)
 
         # find source speakers all mc files
-        self.mc_files = sorted(glob.glob(join(config.test_data_dir, f'{self.src_spk}','*.npy')))
+        self.mc_files = sorted(glob.glob(join(config.test_data_dir, f'{self.src_spk}*.npy')))
         self.src_spk_stats = np.load(join(config.train_data_dir, f'{self.src_spk}_stats.npz'))
         self.src_wav_dir = f'{config.wav_dir}/{self.src_spk}'
         self.trg_wav_dir = f'{config.wav_dir}/{self.trg_spk}'
@@ -94,8 +95,9 @@ class TestDataset(object):
         for i in range(batch_size):
             mcfile = self.mc_files[i]
             filename = basename(mcfile)
-            refwav_path = join(self.trg_wav_dir, filename.replace('npy','wav'))
-            wavfile_path = join(self.src_wav_dir, filename.replace('npy', 'wav'))
+            #refwav_path = join(self.trg_wav_dir, self.trg_spk + '_' +filename.split('_')[1].replace('npy','wav'))
+            refwav_path = join(self.trg_wav_dir, os.listdir(self.trg_wav_dir)[0])
+            wavfile_path = join(self.src_wav_dir, self.src_spk + '_' + filename.split('_')[1].replace('npy', 'wav'))
             batch_data.append((wavfile_path, refwav_path))
         return batch_data 
 
@@ -112,7 +114,7 @@ def process_test_loader(test_loader, G, device, sampling_rate, num_mcep, frame_p
     pair_list = []
     with torch.no_grad():
         for idx, (wav, ref, ref_wav)  in enumerate(test_wavs):
-            print(len(wav))
+            print(len(wav), flush=True)
             wav_name = basename(test_wavfiles[idx][0])
             
             # print(wav_name)
@@ -124,7 +126,7 @@ def process_test_loader(test_loader, G, device, sampling_rate, num_mcep, frame_p
                 mean_log_target=test_loader.logf0s_mean_trg, std_log_target=test_loader.logf0s_std_trg)
             coded_sp = world_encode_spectral_envelop(sp=sp, fs=sampling_rate, dim=num_mcep)
             
-            print("Before being fed into G: ", coded_sp.shape)
+            print("Before being fed into G: ", coded_sp.shape, flush=True)
             coded_sp_norm = (coded_sp - test_loader.mcep_mean_src) / test_loader.mcep_std_src
             coded_sp_norm_tensor = torch.FloatTensor(coded_sp_norm.T).unsqueeze_(0).unsqueeze_(1).to(device)
             
@@ -150,7 +152,7 @@ def process_test_loader(test_loader, G, device, sampling_rate, num_mcep, frame_p
             coded_sp_converted = np.ascontiguousarray(coded_sp_converted)
             
             
-            print("After being fed into G: ", coded_sp_converted.shape)
+            print("After being fed into G: ", coded_sp_converted.shape, flush=True)
             #synthesis to converted wav
             wav_transformed = world_speech_synthesis(f0=f0_converted, coded_sp=coded_sp_converted, 
                                                     ap=ap, fs=sampling_rate, frame_period=frame_period)
@@ -184,7 +186,7 @@ def test(config):
     
     G = eval(config.generator)(num_speakers = config.num_speakers).to(device)
     # Restore model
-    print(f'Loading the trained models from step {config.resume_iters}...')
+    print(f'Loading the trained models from step {config.resume_iters}...', flush=True)
     G_path = join(config.model_save_dir, f'{config.resume_iters}-G.ckpt')
     G.load_state_dict(torch.load(G_path, map_location=lambda storage, loc: storage))
     
@@ -285,7 +287,7 @@ if __name__ == '__main__':
 
     config = parser.parse_args()
     
-    print(config)
+    print(config, flush=True)
     if config.resume_iters is None:
         raise RuntimeError("Please specify the step number for resuming.")
     test(config)

@@ -5,29 +5,36 @@ PYTHON=/share/mini1/sw/std/python/anaconda3-2019.07/v3.7/envs/torch_0.4/bin/pyth
 
 #$PYTHON main.py --wav_dir dump/wav16/
 
-exp=exp/0712st2ls1/
+root=/share/mini1/res/t/vc/studio/timap-en/vctk/
+wav_dir=$root/resmp_wav22050/
+mc_dir=$root/dump/0721mc_10spk_22050/
+
+exp_root=/share/mini1/res/t/vc/studio/timap-en/vctk/exp/vc-gan/
+exp_name=0722stgan3_0/
+exp=$exp_root/$exp_name
 
 
-main_script=main_st2ls.py
+main_script=$root/vc-gan/main_st2ls.py
 
  $PYTHON $main_script \
                     --device 0 \
-                     --wav_dir resmp_wav22050/ \
+                    --wav_dir $wav_dir \
                     --model_save_dir ${exp}/ckpt/ \
                     --sample_step 10000 \
                     --model_save_step 10000\
                     --log_dir ${exp}/tb/\
-                    --num_speakers 4 \
-                    --train_data_dir dump/mc/train/ \
-                    --test_data_dir dump/mc/eval/ \
-                    --sample_dir ./samples/$exp/ \
+                    --num_speakers 10 \
+                    --train_data_dir $mc_dir/train \
+                    --test_data_dir $mc_dir/test \
+                    --sample_dir $exp/samples/ \
                     --num_workers 4 \
                     --lambda_id 5.0 \
+                    --drop_id_step 500000 \
                     --min_length 256 \
-                    --test_src_spk VCC2SF1 \
-                    --test_trg_spk VCC2SM1 \
+                    --test_src_spk p272 \
+                    --test_trg_spk p262 \
                     --sampling_rate 22050 \
-                    --speaker_path ./speaker_used.json \
+                    --speaker_path $mc_dir/speaker_used.json \
                     --batch_size 8 \
                     --resume_iters 130000
                    

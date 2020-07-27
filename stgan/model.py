@@ -51,7 +51,7 @@ class Generator(nn.Module):
         layers.append(nn.Conv2d(curr_dim, 1, kernel_size=7, stride=1, padding=3, bias=False))
         self.main = nn.Sequential(*layers)
 
-    def forward(self, x, c):
+    def forward(self, x, c_ = None, c = None):
         # Replicate spatially and concatenate domain information.
         c = c.view(c.size(0), c.size(1), 1, 1)
         c = c.repeat(1, 1, x.size(2), x.size(3))
