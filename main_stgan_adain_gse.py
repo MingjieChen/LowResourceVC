@@ -1,6 +1,6 @@
 import os
 import argparse
-from stgan_adain.solver import Solver
+from stgan_adain_gse.solver import Solver
 from data_loader import PairDataset, PairTestDataset
 from torch.backends import cudnn
 import json

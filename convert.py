@@ -6,6 +6,8 @@ from stgan.model import Generator as Gen
 from stgan2_ls.model import Generator as LSGen
 from stgan_adain.model import Generator as AdaGen
 from stgan_adain.model import SPEncoder as SPEncoder
+from stgan_adain_gse.model import Generator as AdaGenGSE
+from stgan_adain_gse.model import SPEncoder as SPEncoderGSE
 from torch.autograd import Variable
 import torch
 import torch.nn.functional as F
@@ -189,11 +191,18 @@ def test(config):
     print(f'Loading the trained models from step {config.resume_iters}...', flush=True)
     G_path = join(config.model_save_dir, f'{config.resume_iters}-G.ckpt')
     G.load_state_dict(torch.load(G_path, map_location=lambda storage, loc: storage))
+    G.eval()
     
     if config.generator == 'AdaGen':
         sp_enc = SPEncoder(num_speakers = config.num_speakers).to(device)
         sp_path = join(config.model_save_dir, f'{config.resume_iters}-sp.ckpt')
         sp_enc.load_state_dict(torch.load(sp_path, map_location=lambda storage, loc: storage))
+        sp_enc.eval()
+    elif config.generator == 'AdaGenGSE':
+        sp_enc = SPEncoderGSE(num_speakers = config.num_speakers).to(device)
+        sp_path = join(config.model_save_dir, f'{config.resume_iters}-sp.ckpt')
+        sp_enc.load_state_dict(torch.load(sp_path, map_location=lambda storage, loc: storage))
+        sp_enc.eval()
     else:
         sp_enc = None
     
