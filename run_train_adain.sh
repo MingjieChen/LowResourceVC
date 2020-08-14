@@ -12,17 +12,17 @@ mc_dir=$root/dump/0721mc_10spk_22050/
 
 exp_root=/share/mini1/res/t/vc/studio/timap-en/vctk/exp/vc-gan/
 #exp_name=0731stgan_gse_0/
-exp_name=0806stgan3_0/
+exp_name=0814stgan3_2
 #exp_name=0801stgan_gse_1/
+#exp_name=0811stadain_map_2
+
 exp=$exp_root/$exp_name
 
 
-#main_script=$root/vc-gan/main_stgan_adain.py
+main_script=$root/vc-gan/main_stgan_adain.py
 #main_script=$root/vc-gan/main_stgan_adain_gse.py
-main_script=$root/vc-gan/main_stgan_adain_r1.py
-#exp=exp/0715stadain1/
-#main_script=main_stgan_adain.py
-#main_script=main_stadain_doubdis.py
+#main_script=$root/vc-gan/main_stgan_adain_r1.py
+#main_script=$root/vc-gan/main_stadain_map.py
 $PYTHON $main_script \
                     --device 1\
                     --wav_dir $wav_dir \
@@ -36,6 +36,7 @@ $PYTHON $main_script \
                     --sample_dir $exp/samples/ \
                     --num_workers 8 \
                     --n_critic 1\
+                    --d_lr 0.0001\
                     --g_lr 0.0001\
                     --lambda_id 2.0  \
                     --lambda_gp 1.0 \
@@ -48,5 +49,5 @@ $PYTHON $main_script \
                     --sampling_rate 22050 \
                     --speaker_path $mc_dir/speaker_used.json \
                     --batch_size 8 \
-                    #--resume_iters 120000
+                    #--resume_iters 150000
                    

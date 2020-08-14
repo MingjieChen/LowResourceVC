@@ -133,24 +133,24 @@ class SPEncoder(nn.Module):
         super().__init__()
         
         self.down_sample_1 = nn.Sequential(
-            nn.Conv1d(in_channels=36, out_channels=256, kernel_size=5, stride = 1, padding=2, bias=False),
-            nn.LeakyReLU(0.2),
+            nn.Conv2d(in_channels=1, out_channels=256, kernel_size=5, stride = 1, padding=2, bias=False),
+            nn.LeakyReLU(0.02),
         )
         self.down_sample_2 = nn.Sequential(
-            nn.Conv1d(in_channels=256, out_channels=256, kernel_size=3, stride=2, padding=1, bias=False),
-            nn.LeakyReLU(0.2),
+            nn.Conv2d(in_channels=256, out_channels=256, kernel_size=3, stride=2, padding=1, bias=False),
+            nn.LeakyReLU(0.02),
         )
         self.down_sample_3 = nn.Sequential(
-            nn.Conv1d(in_channels=256, out_channels=256, kernel_size=3, stride=2, padding=1, bias=False),
-            nn.LeakyReLU(0.2),
+            nn.Conv2d(in_channels=256, out_channels=256, kernel_size=3, stride=2, padding=1, bias=False),
+            nn.LeakyReLU(0.02),
         )
         self.down_sample_4 = nn.Sequential(
-            nn.Conv1d(in_channels=256, out_channels=256, kernel_size=3, stride=1, padding=1, bias=False),
-            nn.LeakyReLU(0.2),
+            nn.Conv2d(in_channels=256, out_channels=256, kernel_size=3, stride=1, padding=1, bias=False),
+            nn.LeakyReLU(0.02),
         )
         self.down_sample_5 = nn.Sequential(
-            nn.Conv1d(in_channels=256, out_channels=256, kernel_size=3, stride=1, padding=1, bias=False),
-            nn.LeakyReLU(0.2),
+            nn.Conv2d(in_channels=256, out_channels=256, kernel_size=3, stride=1, padding=1, bias=False),
+            nn.LeakyReLU(0.02),
         )
         
         #self.linear1 = nn.Linear(256, 128)
@@ -162,8 +162,6 @@ class SPEncoder(nn.Module):
 
     def forward(self,x, trg_c):
         
-        x = x.squeeze(1)
-
         out = self.down_sample_1(x)
         
         out = self.down_sample_2(out)
@@ -174,8 +172,8 @@ class SPEncoder(nn.Module):
         
         out = self.down_sample_5(out)
         
-        #b,c,h,w = out.size()
-        #out = out.view(b,c,h*w)
+        b,c,h,w = out.size()
+        out = out.view(b,c,h*w)
         out = torch.mean(out, dim = 2)
 
         #out = self.linear1(out)
@@ -185,7 +183,7 @@ class SPEncoder(nn.Module):
 
         res = torch.stack(res, dim = 1)
         
-        idx = torch.LongTensor(range(x.size(0))).to(x.device)
+        idx = torch.LongTensor(range(b)).to(x.device)
         s = res[idx, trg_c.long()]
 
         return s
@@ -360,7 +358,7 @@ class Discriminator(nn.Module):
         #self.projection_src = nn.Linear(128, 512)
         #self.projection = nn.Linear(256, 512)
 
-    def forward(self, x, c, c_):
+    def forward(self, x, _c, c_):
         #c_onehot = torch.cat((c, c_), dim=1)
         #c_onehot = c_
 
@@ -385,6 +383,44 @@ class Discriminator(nn.Module):
         x = x[idx, c_.long()]
 
         return x
+
+class MappingNetwork(nn.Module):
+    '''mapping network'''
+    def __init__(self, z_dim, num_speakers):
+        super(MappingNetwork, self).__init__()
+
+        layers = []
+        layers += [nn.Linear(z_dim, 512)]
+        layers += [nn.ReLU()]
+        
+        for _ in range(3):
+            layers += [nn.Linear(512,512)]
+            layers += [nn.ReLU()]
+
+        self.shared = nn.Sequential(*layers)
+        
+        self.unshared = nn.ModuleList()
+        for _ in range(num_speakers):
+            self.unshared += [nn.Sequential(nn.Linear(512,512),
+                                nn.ReLU(),
+                                nn.Linear(512,512),
+                                nn.ReLU(),
+                                nn.Linear(512,512),
+                                nn.ReLU(),
+                                nn.Linear(512,128)
+            )]
+
+    def forward(self, z, y):
+        h = self.shared(z)
+        
+        out = []
+        for layer in self.unshared:
+            out += [layer(h)]
+        out = torch.stack(out, dim = 1) # b num_speakers 128
+
+        idx = torch.LongTensor(range(y.size(0))).to(y.device)
+        s = out[idx, y]
+        return s
 '''
 class PatchDiscriminator(nn.Module):
     """Discriminator network with PatchGAN."""
@@ -469,8 +505,8 @@ class PatchDiscriminator(nn.Module):
         # Initial layers.
         self.conv_layer_1 = nn.Sequential(
             nn.Conv2d(in_channels=1, out_channels=128, kernel_size=4, stride=2, padding=1),
-            #nn.LeakyReLU(0.2)
-            GLU(),
+            nn.LeakyReLU(0.2)
+            #GLU()
         )
         #self.conv1 = nn.Conv2d(1, 128, kernel_size= (3,3), stride = 1, padding= 1)
         #self.gate1 = nn.Conv2d(1, 128, kernel_size = 3, stride = 1, padding = 1)
@@ -478,31 +514,31 @@ class PatchDiscriminator(nn.Module):
         # Down-sampling layers.
         self.down_sample_1 = nn.Sequential(
             nn.Conv2d(in_channels=128, out_channels=256, kernel_size=4, stride=2, padding=1, bias=False),
-            #nn.LeakyReLU(0.2)
-            nn.InstanceNorm2d(256, affine = True),
-            GLU()
+            nn.LeakyReLU(0.2)
+            #nn.InstanceNorm2d(256, affine = True),
+            #GLU()
         )
         #self.down_sample_1 = DisDown(128, 256, kernel_size = 3, stride = 2, padding = 1)
 
         self.down_sample_2 = nn.Sequential(
             nn.Conv2d(in_channels=256, out_channels=512, kernel_size=4, stride=2, padding=1, bias=False),
-            #nn.LeakyReLU(0.2)
-            nn.InstanceNorm2d(512, affine = True),
-            GLU()
+            nn.LeakyReLU(0.2)
+            #nn.InstanceNorm2d(512, affine = True),
+            #GLU()
         )
         #self.down_sample_2 = DisDown(256, 512, kernel_size = 3, stride = 2, padding = 1)
         
         self.down_sample_3 = nn.Sequential(
             nn.Conv2d(in_channels=512, out_channels=1024, kernel_size=4, stride=2, padding=1, bias=False),
-            #nn.LeakyReLU(0.2)
-            nn.InstanceNorm2d(1024, affine = True),
-            GLU()
+            nn.LeakyReLU(0.2)
+            #nn.InstanceNorm2d(1024, affine = True),
+            #GLU()
         )
         #self.down_sample_3 = DisDown(512, 1024, kernel_size = 3, stride = 2, padding = 1)
         self.down_sample_4 = nn.Sequential(
             nn.Conv2d(in_channels=1024, out_channels=512, kernel_size=4, stride=2, padding=1, bias=False),
-            #nn.LeakyReLU(0.2)
-            GLU()
+            nn.LeakyReLU(0.2)
+            #GLU()
         )
         
         self.dis_conv = nn.Conv2d(512, num_speakers, kernel_size = (1,8), stride = 1, padding = 0, bias = False )

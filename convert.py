@@ -13,7 +13,7 @@ import torch
 import torch.nn.functional as F
 import numpy as np
 import os
-from os.path import join, basename, dirname, split
+from os.path import join, basename, dirname, split, exists
 import time
 import datetime
 from data_loader import to_categorical
@@ -97,8 +97,10 @@ class TestDataset(object):
         for i in range(batch_size):
             mcfile = self.mc_files[i]
             filename = basename(mcfile)
-            #refwav_path = join(self.trg_wav_dir, self.trg_spk + '_' +filename.split('_')[1].replace('npy','wav'))
-            refwav_path = join(self.trg_wav_dir, os.listdir(self.trg_wav_dir)[0])
+            if exists( join( self.trg_wav_dir, self.trg_spk + '_' + filename.split('_')[1].replace('npy','wav') ) )   :
+                refwav_path = join(self.trg_wav_dir, self.trg_spk + '_' +filename.split('_')[1].replace('npy','wav'))
+            else:
+                refwav_path = join(self.trg_wav_dir, os.listdir(self.trg_wav_dir)[0])
             wavfile_path = join(self.src_wav_dir, self.src_spk + '_' + filename.split('_')[1].replace('npy', 'wav'))
             batch_data.append((wavfile_path, refwav_path))
         return batch_data 
