@@ -1,8 +1,8 @@
 from stgan_adain.model import Generator
 from stgan_adain.model import PatchDiscriminator as Discriminator
-#from stgan_adain.model import PatchCondDiscriminator as Discriminator
 #from stgan_adain.model import Discriminator
-from stgan_adain.model import SPEncoder
+#from stgan_adain.model import SPEncoder
+from stgan_adain.model import SPEncoderPool as SPEncoder
 import torch
 import torch.nn.functional as F
 from os.path import join, basename
@@ -167,7 +167,7 @@ class Solver(object):
 
         # Read a batch of testdata
         test_wavfiles = self.test_loader.get_batch_test_data(batch_size=10)
-        test_wavs = [(self.load_wav(wavfile, sr = self.sampling_rate), mc_trg) for (wavfile, mc_trg) in test_wavfiles]
+        test_wavs = [(self.load_wav(wavfile, sr = self.sampling_rate), mc_src, mc_trg) for (wavfile, mc_src, mc_trg) in test_wavfiles]
 
         # Determine whether do copysynthesize when first do training-time conversion test.
         cpsyn_flag = [True, False][0]
@@ -299,10 +299,10 @@ class Solver(object):
                 mc_src_style_c = self.sp_enc(mc_reconst, spk_label_trg)
                 g_loss_stid = torch.mean(torch.abs(mc_fake_style_c - spk_c_trg))
                 
-                #g_loss_stid = torch.mean(torch.abs(mc_fake_style_c - spk_c_trg)) + torch.mean(torch.abs(mc_src_style_c - spk_c_org)) 
+                #g_loss_stid = torch.log(torch.mean(torch.abs(mc_fake_style_c - spk_c_trg.detach()))) -torch.log( torch.mean(torch.abs(mc_src_style_c - spk_c_org.detach())) )
 
-                #if i> 10000:
-                #    self.lambda_id = 0.
+                if i> 10000:
+                    self.lambda_id = 0.
                 # Backward and optimize.
                 g_loss = self.lambda_adv *  g_loss_fake \
                     + self.lambda_rec * g_loss_rec \
@@ -356,7 +356,7 @@ class Solver(object):
                 num_mcep = 36
                 frame_period = 5
                 with torch.no_grad():
-                    for idx, (wav, mc_trg) in tqdm(enumerate(test_wavs)):
+                    for idx, (wav, mc_src, mc_trg) in tqdm(enumerate(test_wavs)):
                         wav_name = basename(test_wavfiles[idx][0])
                         # print(wav_name)
                         f0, timeaxis, sp, ap = world_decompose(wav=wav, fs=sampling_rate, frame_period=frame_period)
@@ -375,8 +375,9 @@ class Solver(object):
                         
                         # print(conds.size())
                         trg_mc = torch.FloatTensor(np.array([mc_trg.T])).unsqueeze_(0).to(self.device)
+                        src_mc = torch.FloatTensor(np.array([mc_src.T])).unsqueeze_(0).to(self.device)
                         trg_conds = self.sp_enc(trg_mc, trg_idx )
-                        src_conds = self.sp_enc(coded_sp_norm_tensor, src_idx )
+                        src_conds = self.sp_enc(src_mc, src_idx )
                         coded_sp_converted_norm = self.generator(coded_sp_norm_tensor, src_conds, trg_conds).data.cpu().numpy()
                         coded_sp_converted = np.squeeze(coded_sp_converted_norm).T * self.test_loader.mcep_std_trg + self.test_loader.mcep_mean_trg
                         coded_sp_converted = np.ascontiguousarray(coded_sp_converted)

@@ -285,8 +285,8 @@ class PairTestDataset(object):
         self.spk_c_trg = spk_cat
         
         self.src_spk_idx = speakers.index(src_spk)
-        spk_cat = to_categorical([self.src_spk_idx], num_classes=len(speakers))
-        self.spk_c_src = spk_cat
+        src_spk_cat = to_categorical([self.src_spk_idx], num_classes=len(speakers))
+        self.spk_c_src = src_spk_cat
 
     def get_batch_test_data(self, batch_size=8):
         batch_data = []
@@ -298,8 +298,8 @@ class PairTestDataset(object):
             trg_index = np.random.randint(0, len(self.trg_mc_files))
             trg_mc_file = self.trg_mc_files[trg_index]
             trg_mc = np.load(trg_mc_file)
-    
-            batch_data.append((wavfile_path, trg_mc))
+            src_mc = np.load(mcfile)
+            batch_data.append((wavfile_path, src_mc, trg_mc))
         return batch_data       
 
 class TestDataset(object):

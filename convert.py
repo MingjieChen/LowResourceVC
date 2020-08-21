@@ -6,6 +6,7 @@ from stgan.model import Generator as Gen
 from stgan2_ls.model import Generator as LSGen
 from stgan_adain.model import Generator as AdaGen
 from stgan_adain.model import SPEncoder as SPEncoder
+from stgan_adain.model import SPEncoderPool
 from stgan_adain_gse.model import Generator as AdaGenGSE
 from stgan_adain_gse.model import SPEncoder as SPEncoderGSE
 from torch.autograd import Variable
@@ -97,10 +98,10 @@ class TestDataset(object):
         for i in range(batch_size):
             mcfile = self.mc_files[i]
             filename = basename(mcfile)
-            if exists( join( self.trg_wav_dir, self.trg_spk + '_' + filename.split('_')[1].replace('npy','wav') ) )   :
-                refwav_path = join(self.trg_wav_dir, self.trg_spk + '_' +filename.split('_')[1].replace('npy','wav'))
-            else:
-                refwav_path = join(self.trg_wav_dir, os.listdir(self.trg_wav_dir)[0])
+            #if exists( join( self.trg_wav_dir, self.trg_spk + '_' + filename.split('_')[1].replace('npy','wav') ) )   :
+            #    refwav_path = join(self.trg_wav_dir, self.trg_spk + '_' +filename.split('_')[1].replace('npy','wav'))
+            #else:
+            refwav_path = join(self.trg_wav_dir, os.listdir(self.trg_wav_dir)[0])
             wavfile_path = join(self.src_wav_dir, self.src_spk + '_' + filename.split('_')[1].replace('npy', 'wav'))
             batch_data.append((wavfile_path, refwav_path))
         return batch_data 
@@ -112,7 +113,7 @@ def load_wav(wavfile, sr=16000):
     # return wav
 
 
-def process_test_loader(test_loader, G, device, sampling_rate, num_mcep, frame_period, config, sp_enc):
+def process_test_loader(test_loader, G, device, sampling_rate, num_mcep, frame_period, spk2emb, config, sp_enc):
     test_wavfiles = test_loader.get_batch_test_data(batch_size=config.num_converted_wavs)
     test_wavs = [(load_wav(wavfile, sampling_rate), ref_wav, load_wav(ref_wav, sampling_rate) ) for wavfile, ref_wav in test_wavfiles]
     pair_list = []
@@ -135,19 +136,32 @@ def process_test_loader(test_loader, G, device, sampling_rate, num_mcep, frame_p
             coded_sp_norm_tensor = torch.FloatTensor(coded_sp_norm.T).unsqueeze_(0).unsqueeze_(1).to(device)
             
             trg_spk_cat = torch.FloatTensor(test_loader.spk_c_trg).to(device)
-            if sp_enc is not None:
-                _, _, ref_sp, _ = world_decompose(wav = ref_wav, fs = sampling_rate, frame_period = frame_period)
-                coded_ref_sp = world_encode_spectral_envelop(sp = ref_sp, fs = sampling_rate, dim = num_mcep)
-                coded_ref_sp_norm = (coded_ref_sp - test_loader.mcep_mean_trg) / test_loader.mcep_std_trg
-                coded_ref_sp_norm_tensor = torch.FloatTensor(coded_ref_sp_norm.T).unsqueeze_(0).unsqueeze_(1).to(device)
-                
-                trg_spk_label = torch.LongTensor([test_loader.spk_idx]).to(device)           
-                trg_spk_cond = sp_enc(coded_ref_sp_norm_tensor, trg_spk_label)    
+            trg_spk_label = torch.LongTensor([test_loader.spk_idx]).to(device)           
             org_spk_cat = torch.FloatTensor(test_loader.spk_c_org).to(device)
-            #org_spk_label = torch.LongTensor([test_loader.org_idx]).to(device)           
+            org_spk_label = torch.LongTensor([test_loader.org_idx]).to(device)           
             
             if sp_enc is not None:
-                coded_sp_converted_norm = G(coded_sp_norm_tensor, trg_spk_cond, trg_spk_cond).data.cpu().numpy()
+                if not config.use_spk_mean:
+                    
+                    _, _, ref_sp, _ = world_decompose(wav = ref_wav, fs = sampling_rate, frame_period = frame_period)
+                    coded_ref_sp = world_encode_spectral_envelop(sp = ref_sp, fs = sampling_rate, dim = num_mcep)
+                    coded_ref_sp_norm = (coded_ref_sp - test_loader.mcep_mean_trg) / test_loader.mcep_std_trg
+                    coded_ref_sp_norm_tensor = torch.FloatTensor(coded_ref_sp_norm.T).unsqueeze_(0).unsqueeze_(1).to(device)
+                    
+                    trg_spk_cond = sp_enc(coded_ref_sp_norm_tensor, trg_spk_label)    
+                    src_spk_cond = sp_enc(coded_sp_norm_tensor, org_spk_label )
+                else:
+                    if test_loader.trg_spk in spk2emb:
+                        trg_spk_cond = spk2emb[test_loader.trg_spk]
+                        trg_spk_cond = torch.FloatTensor(trg_spk_cond).unsqueeze_(0).to(device)
+                        
+                        src_spk_cond = spk2emb[test_loader.src_spk]
+                        src_spk_cond = torch.FloatTensor(src_spk_cond).unsqueeze_(0).to(device)
+                    else:
+                        raise Exception(f'trg spk {test_loader.trg_spk} not in spk2emb {spk2emb.keys()}')
+            
+            if sp_enc is not None:
+                coded_sp_converted_norm = G(coded_sp_norm_tensor, src_spk_cond, trg_spk_cond).data.cpu().numpy()
             else:
                 coded_sp_converted_norm = G(coded_sp_norm_tensor, org_spk_cat, trg_spk_cat).data.cpu().numpy()
 
@@ -175,15 +189,30 @@ def process_test_loader(test_loader, G, device, sampling_rate, num_mcep, frame_p
                                                 ap=ap, fs=sampling_rate, frame_period=frame_period)
                 librosa.output.write_wav(join(config.convert_dir, str(config.resume_iters), f'cpsyn-{wav_name}'), wav_cpsyn, sampling_rate)
     return pair_list
+
     
 
 
 def test(config):
     
+
     #load speakers
     with open(config.speaker_path) as f:
         speakers = json.load(f)
     
+    spk2emb = {}
+    if config.use_spk_mean and config.generator == 'AdaGen':
+        if not os.path.exists(config.spk_mean_dir):
+            raise Exception()
+        for spk in speakers:
+            if not exists(join(config.spk_mean_dir, f'{spk}-emd_mean.npy')):
+                raise Exception()
+            emb = np.load(join(config.spk_mean_dir, f'{spk}-emd_mean.npy'))
+            if spk not in spk2emb:
+                spk2emb[spk] = emb
+            else:
+                raise Exception('speaker embedding overwrite')
+
     os.makedirs(join(config.convert_dir, str(config.resume_iters)), exist_ok=True)
     sampling_rate, num_mcep, frame_period= config.sample_rate, 36, 5
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -196,7 +225,7 @@ def test(config):
     G.eval()
     
     if config.generator == 'AdaGen':
-        sp_enc = SPEncoder(num_speakers = config.num_speakers).to(device)
+        sp_enc = eval(config.spenc)(num_speakers = config.num_speakers).to(device)
         sp_path = join(config.model_save_dir, f'{config.resume_iters}-sp.ckpt')
         sp_enc.load_state_dict(torch.load(sp_path, map_location=lambda storage, loc: storage))
         sp_enc.eval()
@@ -211,8 +240,8 @@ def test(config):
     
     all_pair_list = []
     if config.src_spk is not None and config.trg_spk is not None:
-        test_loader = TestDataset(config, speakers)
-        pair_list = process_test_loader(test_loader, G, device, sampling_rate, num_mcep, frame_period, config)
+        test_loader = TestDataset(config, speakers = speakers)
+        pair_list = process_test_loader(test_loader, G, device, sampling_rate, num_mcep, frame_period, spk2emb,config, sp_enc)
         all_pair_list.extend(pair_list)
     else:
         # convert all src_trg pairs len(speakers) * (len(speakers) -1) pairs
@@ -221,7 +250,7 @@ def test(config):
                 if src != trg:
                     
                     test_loader = TestDataset(config, src_spk = src, trg_spk = trg, speakers = speakers)
-                    pair_list = process_test_loader(test_loader, G, device, sampling_rate, num_mcep, frame_period, config, sp_enc)
+                    pair_list = process_test_loader(test_loader, G, device, sampling_rate, num_mcep, frame_period, spk2emb, config, sp_enc)
                     all_pair_list.extend(pair_list)
     
     with open(config.pair_list_path,'w') as f:
@@ -281,7 +310,7 @@ if __name__ == '__main__':
     parser.add_argument('--src_spk', type=str, default=None, help = 'target speaker.')
     parser.add_argument('--trg_spk', type=str, default=None, help = 'target speaker.')
     parser.add_argument('--generator', type=str, default='Generator')
-
+    parser.add_argument('--spenc', type = str, default = 'SPEncoder')
     # Directories.
     parser.add_argument('--train_data_dir', type=str, default='./data/mc/train')
     parser.add_argument('--test_data_dir', type=str, default='./data/mc/test')
@@ -294,7 +323,8 @@ if __name__ == '__main__':
 
     #options
     parser.add_argument('--cpsyn', default = False, action = 'store_true')
-
+    parser.add_argument('--use_spk_mean', default = False, action = 'store_true', help = 'compute mean of speaker embedding as use it as the input of Generator')
+    parser.add_argument('--spk_mean_dir', type = str, help = 'speaker embedding mean vector dir, if use_spk_mean is true')
 
     config = parser.parse_args()
     
