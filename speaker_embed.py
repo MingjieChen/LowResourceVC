@@ -97,7 +97,7 @@ def plot_embedding(config, X, y, idx):
         plt.text(X[i,0],X[i,1], y[i],
                 color = plt.cm.Set1(idx[i] / 10.0), fontdict = {'weight':'bold','size':7}
                 )
-    plt.savefig(os.path.join(config.output_dir, f'{config.resume_iters}-speaker_embedding.png'))    
+    plt.savefig(os.path.join(config.plot_output_dir, f'{config.resume_iters}-speaker_embedding.png'))    
     
 
 
@@ -108,7 +108,8 @@ def run(config):
         speakers = json.load(f)
     spk2id = {spk:idx for idx, spk in enumerate(speakers)}
     
-    os.makedirs(config.output_dir, exist_ok = True)
+    os.makedirs(config.plot_output_dir, exist_ok = True)
+    os.makedirs(config.save_output_dir, exist_ok = True)
 
     model, device = build_speaker_encoder(config)
     
@@ -121,7 +122,8 @@ def run(config):
         for spk in spk2embds.keys():
             emb = spk2embds[spk]
             emb_mean = np.mean(emb, axis = 0)
-            np.save(os.path.join(config.output_dir, f'{spk}-emd_mean.npy'), emb_mean)
+            os.makedirs(os.path.join(config.save_output_dir, f'{config.resume_iters}'), exist_ok = True)
+            np.save(os.path.join(config.save_output_dir,f'{config.resume_iters}', f'{spk}-emd_mean.npy'), emb_mean)
     
 
     if config.plot:
@@ -157,7 +159,8 @@ if __name__ == '__main__':
 
     parser.add_argument('--resume_iters', type=int, default=None, help='step to resume for testing.')
     parser.add_argument('--model_save_dir', type=str, default='./models')
-    parser.add_argument('--output_dir', type=str, default='./speaker_embeds/')
+    parser.add_argument('--save_output_dir', type=str, default='./speaker_embeds/')
+    parser.add_argument('--plot_output_dir', type=str, default='./speaker_embeds/')
     parser.add_argument('--mc_test_dir', type = str, help = 'test mc dir')
     parser.add_argument('--speaker_path', type = str, required = True)
     

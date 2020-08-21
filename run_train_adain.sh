@@ -12,7 +12,7 @@ mc_dir=$root/dump/0721mc_10spk_22050/
 
 exp_root=/share/mini1/res/t/vc/studio/timap-en/vctk/exp/vc-gan/
 #exp_name=0731stgan_gse_0/a
-exp_name=0821stgan3_0
+exp_name=0821stgan3_1
 #exp_name=0801stgan_gse_1/
 #exp_name=0811stadain_map_2
 
@@ -38,7 +38,7 @@ $PYTHON $main_script \
                     --n_critic 1\
                     --d_lr 0.0001\
                     --g_lr 0.0001\
-                    --lambda_id 2.0  \
+                    --lambda_id 1.0  \
                     --lambda_gp 1.0 \
                     --lambda_rec 4.0 \
                     --lambda_adv 1.0 \

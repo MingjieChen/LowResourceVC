@@ -202,12 +202,12 @@ def test(config):
     
     spk2emb = {}
     if config.use_spk_mean and config.generator == 'AdaGen':
-        if not os.path.exists(config.spk_mean_dir):
+        if not os.path.exists(join(config.spk_mean_dir, str(config.resume_iters))):
             raise Exception()
         for spk in speakers:
-            if not exists(join(config.spk_mean_dir, f'{spk}-emd_mean.npy')):
+            if not exists(join(config.spk_mean_dir, str(config.resume_iters),f'{spk}-emd_mean.npy')):
                 raise Exception()
-            emb = np.load(join(config.spk_mean_dir, f'{spk}-emd_mean.npy'))
+            emb = np.load(join(config.spk_mean_dir, str(config.resume_iters),f'{spk}-emd_mean.npy'))
             if spk not in spk2emb:
                 spk2emb[spk] = emb
             else:
@@ -240,6 +240,7 @@ def test(config):
     
     all_pair_list = []
     if config.src_spk is not None and config.trg_spk is not None:
+        
         test_loader = TestDataset(config, speakers = speakers)
         pair_list = process_test_loader(test_loader, G, device, sampling_rate, num_mcep, frame_period, spk2emb,config, sp_enc)
         all_pair_list.extend(pair_list)
