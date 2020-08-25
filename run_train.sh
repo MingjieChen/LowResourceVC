@@ -8,7 +8,7 @@ wav_dir=$root/resmp_wav22050/
 mc_dir=$root/dump/0721mc_10spk_22050/
 
 exp_root=/share/mini1/res/t/vc/studio/timap-en/vctk/exp/vc-gan/
-exp_name=0721stgan1/
+exp_name=0825stgan1/
 exp=$exp_root/$exp_name
 
 #$PYTHON main.py --wav_dir dump/wav16/
@@ -45,8 +45,8 @@ main_script=$root/vc-gan/main.py
                     --lambda_id 5.0 \
                     --lambda_cls 1.0 \
                     --min_length 256 \
-                    --test_src_spk p272 \
-                    --test_trg_spk p251 \
+                    --test_src_spk p229 \
+                    --test_trg_spk p232 \
                     --sampling_rate 22050 \
                     --speaker_path $mc_dir/speaker_used.json \
                     --batch_size 32 \

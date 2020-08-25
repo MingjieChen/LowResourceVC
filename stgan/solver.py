@@ -216,7 +216,7 @@ class Solver(object):
             
 
             # Compute loss with fake mc feats.
-            mc_fake = self.G(mc_real, spk_c_trg)
+            mc_fake = self.G(mc_real, c = spk_c_trg)
             out_src, out_cls_spks = self.D(mc_fake.detach())
             d_loss_fake = torch.mean(out_src)
 
@@ -245,13 +245,13 @@ class Solver(object):
             
             if (i+1) % self.n_critic == 0:
                 # Original-to-target domain.
-                mc_fake = self.G(mc_real, spk_c_trg)
+                mc_fake = self.G(mc_real, c = spk_c_trg)
                 out_src, out_cls_spks = self.D(mc_fake)
                 g_loss_fake = - torch.mean(out_src)
                 g_loss_cls_spks = self.classification_loss(out_cls_spks, spk_label_trg)
 
                 # Target-to-original domain.
-                mc_reconst = self.G(mc_fake, spk_c_org)
+                mc_reconst = self.G(mc_fake, c = spk_c_org)
                 g_loss_rec = torch.mean(torch.abs(mc_real - mc_reconst))
 
                 # Backward and optimize.
@@ -300,7 +300,7 @@ class Solver(object):
                         coded_sp_norm_tensor = torch.FloatTensor(coded_sp_norm.T).unsqueeze_(0).unsqueeze_(1).to(self.device)
                         conds = torch.FloatTensor(self.test_loader.spk_c_trg).to(self.device)
                         # print(conds.size())
-                        coded_sp_converted_norm = self.G(coded_sp_norm_tensor, conds).data.cpu().numpy()
+                        coded_sp_converted_norm = self.G(coded_sp_norm_tensor, c = conds).data.cpu().numpy()
                         coded_sp_converted = np.squeeze(coded_sp_converted_norm).T * self.test_loader.mcep_std_trg + self.test_loader.mcep_mean_trg
                         coded_sp_converted = np.ascontiguousarray(coded_sp_converted)
                         # decoded_sp_converted = world_decode_spectral_envelop(coded_sp = coded_sp_converted, fs = sampling_rate)
