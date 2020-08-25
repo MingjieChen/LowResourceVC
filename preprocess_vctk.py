@@ -113,7 +113,7 @@ if __name__ == '__main__':
     mc_dir_test = argv.mc_dir_test
     num_workers = argv.num_workers if argv.num_workers is not None else cpu_count()
 
-    if argv.do_resample is not None:
+    if argv.do_resample:
         # The original wav in VCTK is 48K, first we want to resample to 16K
         resample_to_16k(origin_wavpath, target_wavpath, num_workers=num_workers,sr= argv.sample_rate)
 
