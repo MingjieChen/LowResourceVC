@@ -7,6 +7,7 @@ from stgan2_ls.model import Generator as LSGen
 from stgan_adain.model import Generator as AdaGen
 from stgan_adain.model import SPEncoder as SPEncoder
 from stgan_adain.model import SPEncoderPool
+from stgan_adain.model import SPEncoderPool1D
 from stgan_adain_gse.model import Generator as AdaGenGSE
 from stgan_adain_gse.model import SPEncoder as SPEncoderGSE
 from torch.autograd import Variable
@@ -225,7 +226,7 @@ def test(config):
     G.eval()
     
     if config.generator == 'AdaGen':
-        sp_enc = eval(config.spenc)(num_speakers = config.num_speakers).to(device)
+        sp_enc = eval(config.spenc)(num_speakers = config.num_speakers,spk_cls = config.spk_cls ).to(device)
         sp_path = join(config.model_save_dir, f'{config.resume_iters}-sp.ckpt')
         sp_enc.load_state_dict(torch.load(sp_path, map_location=lambda storage, loc: storage))
         sp_enc.eval()
@@ -312,6 +313,7 @@ if __name__ == '__main__':
     parser.add_argument('--trg_spk', type=str, default=None, help = 'target speaker.')
     parser.add_argument('--generator', type=str, default='Generator')
     parser.add_argument('--spenc', type = str, default = 'SPEncoder')
+    parser.add_argument('--spk_cls', default = False, action = 'store_true')
     # Directories.
     parser.add_argument('--train_data_dir', type=str, default='./data/mc/train')
     parser.add_argument('--test_data_dir', type=str, default='./data/mc/test')

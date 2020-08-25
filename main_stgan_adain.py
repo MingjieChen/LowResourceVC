@@ -61,12 +61,14 @@ if __name__ == '__main__':
     parser.add_argument('--lambda_id', type=float, default=5, help='weight for id mapping loss')
     parser.add_argument('--lambda_spid', type=float, default=5, help='weight for id mapping loss')
     parser.add_argument('--sampling_rate', type=int, default=16000, help='sampling rate')
-    
+    parser.add_argument('--discriminator', type = str, default = 'PatchDiscriminator')
+    parser.add_argument('--spenc', type = str, default = 'SPEncoder')
+       
     # Training configuration.
     parser.add_argument('--batch_size', type=int, default=8, help='mini-batch size')
     parser.add_argument('--min_length', type=int, default=256 )
     parser.add_argument('--num_iters', type=int, default=500000, help='number of total iterations for training D')
-    parser.add_argument('--drop_id_step', type=int, default=500000, help='steps drop id mapping loss')
+    parser.add_argument('--drop_id_step', type = int, default = 10000, help = 'steps drop id mapping loss')
     parser.add_argument('--num_iters_decay', type=int, default=100000, help='number of iterations for decaying lr')
     parser.add_argument('--g_lr', type=float, default=0.0002, help='learning rate for G')
     parser.add_argument('--d_lr', type=float, default=0.0001, help='learning rate for D')
@@ -75,6 +77,7 @@ if __name__ == '__main__':
     parser.add_argument('--beta2', type=float, default=0.999, help='beta2 for Adam optimizer')
     parser.add_argument('--resume_iters', type=int, default=None, help='resume training from this step')
     parser.add_argument('--device', type=int, default=0, help='choosing cuda device')
+    parser.add_argument('--spk_cls', default = False, action = 'store_true', help = 'if or not use spk cls loss for SPEncoder module')
 
     # Test configuration.
     parser.add_argument('--test_iters', type=int, default=100000, help='test model from this step')

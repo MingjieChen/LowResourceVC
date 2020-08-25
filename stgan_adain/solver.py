@@ -1,8 +1,9 @@
 from stgan_adain.model import Generator
-from stgan_adain.model import PatchDiscriminator as Discriminator
-#from stgan_adain.model import Discriminator
-#from stgan_adain.model import SPEncoder
-from stgan_adain.model import SPEncoderPool as SPEncoder
+from stgan_adain.model import PatchDiscriminator 
+from stgan_adain.model import Discriminator
+from stgan_adain.model import SPEncoder
+from stgan_adain.model import SPEncoderPool 
+from stgan_adain.model import SPEncoderPool1D
 import torch
 import torch.nn.functional as F
 from os.path import join, basename
@@ -24,6 +25,10 @@ class Solver(object):
         self.test_loader = test_loader
         self.sampling_rate = config.sampling_rate
 
+        # submodules
+        self.D_name = config.discriminator
+        self.SPE_name = config.spenc
+
         # Model configurations.
         self.num_speakers = config.num_speakers
         self.lambda_rec = config.lambda_rec
@@ -31,6 +36,9 @@ class Solver(object):
         self.lambda_id = config.lambda_id
         self.lambda_spid = config.lambda_spid
         self.lambda_adv = config.lambda_adv    
+        self.lambda_cls = config.lambda_cls
+        self.drop_id_step = config.drop_id_step
+        self.spk_cls = config.spk_cls
 
         # Training configurations.
         self.batch_size = config.batch_size
@@ -69,8 +77,8 @@ class Solver(object):
     def build_model(self):
         """Create a generator and a discriminator."""
         self.generator = Generator(num_speakers=self.num_speakers)
-        self.discriminator = Discriminator(num_speakers=self.num_speakers)
-        self.sp_enc = SPEncoder(num_speakers = self.num_speakers)
+        self.discriminator = eval(self.D_name)(num_speakers=self.num_speakers)
+        self.sp_enc = eval(self.SPE_name)(num_speakers = self.num_speakers, spk_cls = self.spk_cls)
 
         self.g_optimizer = torch.optim.Adam(list(self.generator.parameters()) + list(self.sp_enc.parameters()), self.g_lr, [self.beta1, self.beta2])
         self.d_optimizer = torch.optim.Adam(self.discriminator.parameters(), self.d_lr, [self.beta1, self.beta2])
@@ -275,9 +283,17 @@ class Solver(object):
             if (i+1) % self.n_critic == 0:
                 
                 # org and trg speaker cond
-                spk_c_trg = self.sp_enc(mc_trg, spk_label_trg)
-                spk_c_org = self.sp_enc(mc_src, spk_label_org)
                 
+                if self.spk_cls:
+
+                    spk_c_trg, cls_out_trg = self.sp_enc(mc_trg, spk_label_trg, cls_out = True)
+                    spk_c_org, cls_out_org = self.sp_enc(mc_src, spk_label_org, cls_out = True)
+                    
+                    cls_loss = self.classification_loss(cls_out_trg, spk_label_trg) + self.classification_loss(cls_out_org, spk_label_org)   
+                else:
+                    spk_c_trg = self.sp_enc(mc_trg, spk_label_trg)
+                    spk_c_org = self.sp_enc(mc_src, spk_label_org)
+
                 
                 # Original-to-target domain.
                 mc_fake = self.generator(mc_src, spk_c_org,  spk_c_trg)
@@ -301,13 +317,16 @@ class Solver(object):
                 
                 #g_loss_stid = torch.log(torch.mean(torch.abs(mc_fake_style_c - spk_c_trg.detach()))) -torch.log( torch.mean(torch.abs(mc_src_style_c - spk_c_org.detach())) )
 
-                if i> 10000:
+                if i> self.drop_id_step:
                     self.lambda_id = 0.
                 # Backward and optimize.
                 g_loss = self.lambda_adv *  g_loss_fake \
                     + self.lambda_rec * g_loss_rec \
                     + self.lambda_id * g_loss_id \
                     + self.lambda_spid * g_loss_stid
+                
+                if self.spk_cls:
+                    g_loss += self.lambda_cls * cls_loss
 
                 self.reset_grad()
                 g_loss.backward()
@@ -318,7 +337,8 @@ class Solver(object):
                 #loss['G/loss'] = g_loss.item()
                 loss['G/loss_id'] = g_loss_id.item()
                 loss['G/loss_stid'] = g_loss_stid.item()
-            
+                if self.spk_cls:
+                    loss['G/spk_cls'] = cls_loss.item()
             
             # =================================================================================== #
             #                                 4. Miscellaneous                                    #
@@ -395,8 +415,8 @@ class Solver(object):
 
 
             # Decay learning rates.
-            if (i+1) % self.lr_update_step == 0 and (i+1) > (self.num_iters - self.num_iters_decay):
-                g_lr -= (self.g_lr / float(self.num_iters_decay))
-                d_lr -= (self.d_lr / float(self.num_iters_decay))
-                self.update_lr(g_lr, d_lr)
-                print('Decayed learning rates, g_lr: {}, d_lr: {}'.format(g_lr, d_lr), flush=True)
+            #if (i+1) % self.lr_update_step == 0 and (i+1) > (self.num_iters - self.num_iters_decay):
+            #    g_lr -= (self.g_lr / float(self.num_iters_decay))
+            #    d_lr -= (self.d_lr / float(self.num_iters_decay))
+            #    self.update_lr(g_lr, d_lr)
+            #    print('Decayed learning rates, g_lr: {}, d_lr: {}'.format(g_lr, d_lr), flush=True)

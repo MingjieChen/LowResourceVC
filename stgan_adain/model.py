@@ -23,6 +23,9 @@ class AdaptiveInstanceNormalisation(nn.Module):
 
         self.dim_in = dim_in
         #self.style_num = style_num
+        #self.gam_gate_s = nn.Linear(2*dim_c, dim_in)
+        #self.bet_gate_s = nn.Linear(2*dim_c, dim_in)
+        
         #self.gamma_s = nn.Linear(dim_c, dim_in)
         #self.beta_s = nn.Linear(dim_c, dim_in)
         
@@ -39,11 +42,11 @@ class AdaptiveInstanceNormalisation(nn.Module):
 
         c = torch.cat([c_src, c_trg], dim = -1)
         
-        #gamma = self.gamma_t(c_trg.to(x.device)) + self.gamma_s(c_src.to(x.device))
-        gamma = self.gamma_t(c.to(x.device))
+        #gamma = self.gamma_t(c_trg) + torch.sigmoid(self.gam_gate_s(c)) * self.gamma_s(c_src) 
+        gamma = self.gamma_t(c)
         gamma = gamma.view(-1, self.dim_in, 1)
-        #beta = self.beta_t(c_trg.to(x.device)) #+ self.beta_s(c_src.to(x.device))
-        beta = self.beta_t(c.to(x.device))
+        #beta = self.beta_t(c_trg) + torch.sigmoid(self.bet_gate_s(c)) * self.beta_s(c_src)
+        beta = self.beta_t(c)
         beta = beta.view(-1, self.dim_in, 1)
 
         h = (x - u) / std
@@ -129,12 +132,116 @@ class SEBlock(nn.Module):
 
         return out
 
+class SPEncoderPool1D(nn.Module):
+    '''speaker encoder for adaptive instance normalization, add statistic pooling layer'''
+    
+    def __init__(self, num_speakers = 4, spk_cls = False):
+        
+        super().__init__()
+        self.cls = spk_cls
+        
+        '''
+        self.down_sample_1 = nn.Sequential(
+            nn.Conv2d(in_channels=1, out_channels=256, kernel_size=5, stride = 1, padding=2, bias=False),
+            nn.LeakyReLU(0.02),
+        )
+        self.down_sample_2 = nn.Sequential(
+            nn.Conv2d(in_channels=256, out_channels=256, kernel_size=3, stride=2, padding=1, bias=False),
+            nn.LeakyReLU(0.02),
+        )
+        self.down_sample_3 = nn.Sequential(
+            nn.Conv2d(in_channels=256, out_channels=256, kernel_size=3, stride=2, padding=1, bias=False),
+            nn.LeakyReLU(0.02),
+        )
+        self.down_sample_4 = nn.Sequential(
+            nn.Conv2d(in_channels=256, out_channels=256, kernel_size=3, stride=1, padding=1, bias=False),
+            nn.LeakyReLU(0.02),
+        )
+        self.down_sample_5 = nn.Sequential(
+            nn.Conv2d(in_channels=256, out_channels=256, kernel_size=3, stride=1, padding=1, bias=False),
+            nn.LeakyReLU(0.02),
+        )
+        '''
+        
+        
+        self.down_sample_1 = nn.Sequential(
+            nn.Conv1d(in_channels=36, out_channels=256, kernel_size=5, stride = 1, padding=2, bias=False),
+            nn.LeakyReLU(0.02),
+        )
+        self.down_sample_2 = nn.Sequential(
+            nn.Conv1d(in_channels=256, out_channels=256, kernel_size=3, stride=2, padding=1, bias=False),
+            nn.LeakyReLU(0.02),
+        )
+        self.down_sample_3 = nn.Sequential(
+            nn.Conv1d(in_channels=256, out_channels=256, kernel_size=3, stride=2, padding=1, bias=False),
+            nn.LeakyReLU(0.02),
+        )
+        self.down_sample_4 = nn.Sequential(
+            nn.Conv1d(in_channels=256, out_channels=256, kernel_size=3, stride=1, padding=1, bias=False),
+            nn.LeakyReLU(0.02),
+        )
+        self.down_sample_5 = nn.Sequential(
+            nn.Conv1d(in_channels=256, out_channels=256, kernel_size=3, stride=1, padding=1, bias=False),
+            nn.LeakyReLU(0.02),
+        )
+        #self.linear1 = nn.Linear(256, 128)
+        
+        self.unshared = nn.ModuleList()
+
+        for _ in range(num_speakers):
+            self.unshared += [nn.Linear(512, 128)]
+        
+        if self.cls:
+            self.cls_layer = nn.Linear(128, num_speakers)
+    
+        
+
+    def forward(self,x, trg_c, cls_out = False):
+        
+        x = x.squeeze(1)
+
+        out = self.down_sample_1(x)
+        
+        out = self.down_sample_2(out)
+
+        out = self.down_sample_3(out)
+        
+        out = self.down_sample_4(out)
+        
+        out = self.down_sample_5(out)
+        
+        #b,c,h,w = out.size()
+        #out = out.view(b,c,h*w)
+        out_mean = torch.mean(out, dim = 2)
+        out_std = torch.std(out, dim = 2)
+        
+        out = torch.cat([out_mean, out_std], dim = 1) 
+        
+        #out = self.linear1(out)
+        res = []
+        for layer in self.unshared:
+            
+            res += [layer(out)]
+
+        res = torch.stack(res, dim = 1)
+        
+        idx = torch.LongTensor(range(x.size(0))).to(x.device)
+        s = res[idx, trg_c.long()]
+        
+        if self.cls and cls_out:
+            cls_out = self.cls_layer(s)
+            return s, cls_out
+        else:
+            return s
 class SPEncoderPool(nn.Module):
     '''speaker encoder for adaptive instance normalization, add statistic pooling layer'''
     
-    def __init__(self, num_speakers = 4):
+    def __init__(self, num_speakers = 4, spk_cls = False):
         
         super().__init__()
+        self.cls = spk_cls
+        
+        
         self.down_sample_1 = nn.Sequential(
             nn.Conv2d(in_channels=1, out_channels=256, kernel_size=5, stride = 1, padding=2, bias=False),
             nn.LeakyReLU(0.02),
@@ -185,8 +292,13 @@ class SPEncoderPool(nn.Module):
 
         for _ in range(num_speakers):
             self.unshared += [nn.Linear(512, 128)]
+        
+        if self.cls:
+            self.cls_layer = nn.Linear(128, num_speakers)
+    
+        
 
-    def forward(self,x, trg_c):
+    def forward(self,x, trg_c, cls_out = False):
         
         #x = x.squeeze(1)
 
@@ -217,12 +329,16 @@ class SPEncoderPool(nn.Module):
         
         idx = torch.LongTensor(range(x.size(0))).to(x.device)
         s = res[idx, trg_c.long()]
-
-        return s
+        
+        if self.cls and cls_out:
+            cls_out = self.cls_layer(s)
+            return s, cls_out
+        else:
+            return s
 class SPEncoder(nn.Module):
     '''speaker encoder for adaptive instance normalization'''
     
-    def __init__(self, num_speakers = 4):
+    def __init__(self, num_speakers = 4, spk_cls = False):
         
         super().__init__()
         self.down_sample_1 = nn.Sequential(
@@ -440,7 +556,7 @@ class Discriminator(nn.Module):
         self.num_speakers = num_speakers
         # Initial layers.
         self.conv_layer_1 = nn.Sequential(
-            nn.Conv2d(in_channels=1, out_channels=128, kernel_size=(3, 3), stride=(1, 1), padding=1),
+            nn.Conv2d(in_channels=1, out_channels=128, kernel_size=(3, 3), stride=(1, 2), padding=1),
             GLU()
         )
         #self.conv1 = nn.Conv2d(1, 128, kernel_size= (3,3), stride = 1, padding= 1)
@@ -468,7 +584,7 @@ class Discriminator(nn.Module):
         )
         #self.down_sample_3 = DisDown(512, 1024, kernel_size = 3, stride = 2, padding = 1)
         self.down_sample_4 = nn.Sequential(
-            nn.Conv2d(in_channels=1024, out_channels=512, kernel_size=(1, 5), stride=(1, 1), padding=(0, 2), bias = False),
+            nn.Conv2d(in_channels=1024, out_channels=512, kernel_size=(1, 5), stride=(1, 2), padding=(0, 2), bias = False),
             GLU()
         )
         #self.down_sample_4 = DisDown(1024, 512, kernel_size = (1,5), stride = 1, padding = (0,2))

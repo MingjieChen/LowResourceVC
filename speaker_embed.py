@@ -8,6 +8,7 @@ import argparse
 import torch
 from stgan_adain.model import SPEncoder
 from stgan_adain.model import SPEncoderPool
+from stgan_adain.model import SPEncoderPool1D
 from sklearn import manifold
 import matplotlib.pyplot as plt
 from matplotlib.ticker import NullFormatter
@@ -17,7 +18,7 @@ import numpy as np
 import json
 def build_speaker_encoder(config):
     
-    model = eval(config.spenc_model)(config.num_speakers)
+    model = eval(config.spenc_model)(config.num_speakers, spk_cls = config.spk_cls)
     print(f'Loading the trained Speaker Encoder model from dir {config.model_save_dir} step {config.resume_iters}...', flush=True)
     
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -167,5 +168,7 @@ if __name__ == '__main__':
     parser.add_argument('--plot', default = False, action = 'store_true')
     parser.add_argument('--save', default = False, action = 'store_true')   
     parser.add_argument('--spenc_model', type = str, default = 'SPEncoder', help = 'speaker encoder model')
+    parser.add_argument('--spk_cls', default = False, action = 'store_true')
+    
     config = parser.parse_args()
     run(config)
