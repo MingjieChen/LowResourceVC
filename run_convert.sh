@@ -7,10 +7,10 @@ PYTHON=/share/mini1/sw/std/python/anaconda3-2019.07/v3.7/envs/torch_0.4/bin/pyth
 root=/share/mini1/res/t/vc/studio/timap-en/vctk
 #exp=$root/exp/vc-gan/0722stgan3_0
 
-exp=$root/exp/vc-gan/0825stgan3_0
-iters=30000
+exp=$root/exp/vc-gan/0826stgan3_2
+iters=240000
 source_speaker=p229
-speaker_encoder_model=SPEncoderPool1D
+speaker_encoder_model=SPEncoderPool
 generator_model=AdaGen
 
 $PYTHON $root/vc-gan/speaker_embed.py \

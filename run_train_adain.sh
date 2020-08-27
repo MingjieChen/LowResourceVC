@@ -12,7 +12,7 @@ mc_dir=$root/dump/0721mc_10spk_22050/
 
 exp_root=/share/mini1/res/t/vc/studio/timap-en/vctk/exp/vc-gan/
 #exp_name=0731stgan_gse_0/a
-exp_name=0825stgan3_4
+exp_name=0826stgan3_2
 #exp_name=0801stgan_gse_1/
 #exp_name=0811stadain_map_2
 
@@ -37,11 +37,11 @@ $PYTHON $main_script \
                     --num_workers 8 \
                     --n_critic 1\
                     --d_lr 0.0001\
-                    --g_lr 0.0002\
-                    --lambda_id 5.0  \
+                    --g_lr 0.0001\
+                    --lambda_id 2.0  \
                     --lambda_gp 1.0 \
-                    --lambda_rec 10.0 \
-                    --lambda_adv 4.0 \
+                    --lambda_rec 4.0 \
+                    --lambda_adv 1.0 \
                     --lambda_spid 1.0 \
                     --lambda_cls 1e-4 \
                     --min_length 256 \
@@ -50,9 +50,9 @@ $PYTHON $main_script \
                     --sampling_rate 22050 \
                     --speaker_path $mc_dir/speaker_used.json \
                     --discriminator PatchDiscriminator \
-                    --spenc SPEncoderPool1D \
+                    --spenc SPEncoderPool \
                     --batch_size 8 \
                     --drop_id_step 500000\
-                    #--resume_iters 120000\
+                    --resume_iters 120000\
                     #--spk_cls \
                    
