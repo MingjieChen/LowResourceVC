@@ -112,7 +112,7 @@ class PairDataset(data.Dataset):
         # choose another spk
         speakers =self.speakers[:]
         speakers.remove(src_spk)
-        trg_spk_index = np.random.randint(0, 2)
+        trg_spk_index = np.random.randint(0, len(speakers))
         
         trg_spk = speakers[trg_spk_index]
         
