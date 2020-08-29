@@ -16,6 +16,10 @@ import os
 from glob import glob
 import numpy as np
 import json
+from concurrent.futures import ProcessPoolExecutor
+from functools import partial
+import subprocess
+from tqdm import tqdm
 def build_speaker_encoder(config):
     
     model = eval(config.spenc_model)(config.num_speakers, spk_cls = config.spk_cls)
@@ -67,19 +71,38 @@ def _speaker_embeds(model, device, spk_idx, mc_dirs):
         
         
 
-def generate_speaker_embeds(model, device, spk2id, spk2mc_dirs):
+def generate_speaker_embeds(model, device, spk2id, spk2mc_dirs, num_workers = None):
+    
+    # whether or not use multi process
+    if num_workers is not None:
+        executor = ProcessPoolExecutor(max_workers = num_workers)
     
     spk2embds = {}
-    
+    futures = []
     for spk in spk2mc_dirs.keys():
         
         spk_idx = spk2id[spk]
         print(f"process speaker {spk} idx {spk_idx}",flush=True)
 
-
+        
         mc_dirs = spk2mc_dirs[spk][:]
-        embds = _speaker_embeds(model, device, spk_idx, mc_dirs)
-        spk2embds[spk] = embds
+        if num_workers is not None:
+            futures.append(
+                (
+                spk,
+                executor.submit(
+                    partial(_speaker_embeds, model, device, spk_idx, mc_dirs)
+                    )
+                )
+            )
+        else:
+            embds = _speaker_embeds(model, device, spk_idx, mc_dirs)
+            spk2embds[spk] = embds
+    
+    
+    if num_workers is not None:
+        spk2embds = {spk : future.result() for spk, future in tqdm(futures)}
+
     return spk2embds
 
 
@@ -93,10 +116,16 @@ def plot_embedding(config, X, y, idx):
     plt.figure()
 
     ax = plt.subplot(111)
-
+    
+    if config.num_speakers == 10:
+        division = 10.0
+    elif config.num_speakers == 109:
+        division = 100.0
+    else:
+        raise Exception(f'not support num_speakers {config.num_speakers}')
     for i in range(X.shape[0]):
         plt.text(X[i,0],X[i,1], y[i],
-                color = plt.cm.Set1(idx[i] / 10.0), fontdict = {'weight':'bold','size':7}
+                color = plt.cm.Set1(idx[i] / division), fontdict = {'weight':'bold','size':7}
                 )
     plt.savefig(os.path.join(config.plot_output_dir, f'{config.resume_iters}-speaker_embedding.png'))    
     
@@ -116,7 +145,7 @@ def run(config):
     
     spk2mc_dirs = load_input_mc(config, speakers)
     
-    spk2embds = generate_speaker_embeds(model, device, spk2id, spk2mc_dirs)
+    spk2embds = generate_speaker_embeds(model, device, spk2id, spk2mc_dirs, num_workers = config.num_workers)
     
     # save speaker embedding mean vectors
     if config.save:
@@ -169,6 +198,6 @@ if __name__ == '__main__':
     parser.add_argument('--save', default = False, action = 'store_true')   
     parser.add_argument('--spenc_model', type = str, default = 'SPEncoder', help = 'speaker encoder model')
     parser.add_argument('--spk_cls', default = False, action = 'store_true')
-    
+    parser.add_argument('--num_workers', default = None, type = int, help = 'multi process')
     config = parser.parse_args()
     run(config)

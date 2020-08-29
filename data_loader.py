@@ -52,7 +52,7 @@ def to_categorical(y, num_classes=None):
 class PairDataset(data.Dataset):
     '''dataset for training with pair samples input'''
     
-    def __init__(self, data_dir, speakers, min_length = 256):
+    def __init__(self, data_dir, speakers, min_length = 256, few_shot = None):
         
         super().__init__()
 
@@ -67,7 +67,14 @@ class PairDataset(data.Dataset):
                 self.spk2files[spk] = []
             
             _spk_files = glob.glob(join(data_dir, f'{spk}*.npy'))
+            
             mc_files = self.rm_too_short_utt(_spk_files, min_length)
+
+            if few_shot is not None:
+                assert isinstance(few_shot, int)
+                assert few_shot < len(mc_files), f'speaker {spk} training samples less than few shot limit'
+                mc_files = mc_files[: few_shot]
+                print(f"speaker {spk} few shot training sampels {len(mc_files)}", flush=True)
             
             self.spk2files[spk].extend(mc_files)
             
@@ -203,16 +210,34 @@ class CycDataset(data.Dataset):
 
 class MyDataset(data.Dataset):
     """Dataset for MCEP features and speaker labels."""
-    def __init__(self, data_dir, speakers, min_length = 256):
+    def __init__(self, data_dir, speakers, min_length = 256, few_shot = None):
         self.min_length = min_length
         self.speakers = speakers[:]
         mc_files = []
         for spk in self.speakers:
-            mc_files.extend(glob.glob(join(data_dir, f'{spk}_*.npy')))
+            # [0827 new feature]: add few shot learning feature, limit training samples
+            if few_shot is not None:
+                mc_dirs = list(glob.glob(join(data_dir, f'{spk}_*.npy')))
+                mc_dirs = self.rm_too_short_utt(mc_dirs, min_length)
+                
+                assert isinstance(few_shot, int)
+                assert few_shot < len(mc_dirs)
+                few_shot_mc_dirs = mc_dirs[:few_shot]
+                duration = self.calc_duration(few_shot_mc_dirs, 5)
+                print(f"spk {spk} org samps {len(mc_dirs)} few shot samps {len(few_shot_mc_dirs)} duration {duration}", flush=True)
+                mc_files.extend(few_shot_mc_dirs)
+            else:
+
+                mc_files.extend(glob.glob(join(data_dir, f'{spk}_*.npy')))
+                mc_files = self.rm_too_shot_utt(mc_files, min_length)
+        
+        self.mc_files = mc_files[:]
+
+
         #mc_files = glob.glob(join(data_dir, '*.npy'))
         #mc_files = [i for i in mc_files if basename(i)[:4] in speakers] 
         
-        self.mc_files = self.rm_too_short_utt(mc_files, min_length)
+        #self.mc_files = self.rm_too_short_utt(mc_files, min_length)
         self.num_files = len(self.mc_files)
         print("\t Number of training samples: ", self.num_files)
         for f in self.mc_files:
@@ -220,7 +245,16 @@ class MyDataset(data.Dataset):
             if mc.shape[0] <= min_length:
                 print(f)
                 raise RuntimeError(f"The data may be corrupted! We need all MCEP features having more than {min_length} frames!") 
-
+    
+    def calc_duration(self, mc_files, frame_rate):
+        
+        n_frames = 0
+        for mcf in mc_files:
+            mc = np.load(mcf)
+            frms = mc.shape[0]
+            n_frames += frms
+        duration = (n_frames * frame_rate) / 1000.0
+        return duration
     def rm_too_short_utt(self, mc_files, min_length):
         new_mc_files = []
         for mcfile in mc_files:
@@ -336,8 +370,8 @@ class TestDataset(object):
             batch_data.append(wavfile_path)
         return batch_data       
 
-def get_loader(data_dir, batch_size=32, min_length = 256,mode='train', speakers = None, num_workers=1):
-    dataset = MyDataset(data_dir, speakers, min_length)
+def get_loader(data_dir, batch_size=32, min_length = 256,mode='train', speakers = None, num_workers=1, few_shot = None):
+    dataset = MyDataset(data_dir, speakers, min_length, few_shot = few_shot)
     data_loader = data.DataLoader(dataset=dataset,
                                   batch_size=batch_size,
                                   shuffle=(mode=='train'),

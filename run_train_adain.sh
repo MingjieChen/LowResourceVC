@@ -8,11 +8,12 @@ PYTHON=/share/mini1/sw/std/python/anaconda3-2019.07/v3.7/envs/torch_0.4/bin/pyth
 #exp=exp/0705stada_doub0/
 root=/share/mini1/res/t/vc/studio/timap-en/vctk/
 wav_dir=$root/resmp_wav22050/
-mc_dir=$root/dump/0721mc_10spk_22050/
-
+#mc_dir=$root/dump/0721mc_10spk_22050/
+mc_dir=$root/dump/0825mc_109spk_22050
+num_spks=109
 exp_root=/share/mini1/res/t/vc/studio/timap-en/vctk/exp/vc-gan/
 #exp_name=0731stgan_gse_0/a
-exp_name=0826stgan3_2
+exp_name=0829stgan3_1
 #exp_name=0801stgan_gse_1/
 #exp_name=0811stadain_map_2
 
@@ -30,7 +31,7 @@ $PYTHON $main_script \
                     --sample_step 10000 \
                     --model_save_step 10000\
                     --log_dir ${exp}/tb/\
-                    --num_speakers 10 \
+                    --num_speakers $num_spks \
                     --train_data_dir $mc_dir/train \
                     --test_data_dir $mc_dir/test \
                     --sample_dir $exp/samples/ \
@@ -43,7 +44,7 @@ $PYTHON $main_script \
                     --lambda_rec 4.0 \
                     --lambda_adv 1.0 \
                     --lambda_spid 1.0 \
-                    --lambda_cls 1e-4 \
+                    --lambda_cls 0.1  \
                     --min_length 256 \
                     --test_src_spk p229 \
                     --test_trg_spk p232 \
@@ -52,7 +53,8 @@ $PYTHON $main_script \
                     --discriminator PatchDiscriminator \
                     --spenc SPEncoderPool \
                     --batch_size 8 \
-                    --drop_id_step 500000\
-                    --resume_iters 120000\
-                    #--spk_cls \
+                    --drop_id_step 10000\
+                    --few_shot 20 \
+                    --spk_cls \
+                    #--resume_iters 120000\
                    

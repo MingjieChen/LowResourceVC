@@ -27,7 +27,7 @@ def main(config):
     print(f"load speakers {speakers}", flush=True)
     
     # Data loader.
-    train_loader = get_loader(config.train_data_dir, config.batch_size, config.min_length, 'train', speakers, num_workers=config.num_workers,)
+    train_loader = get_loader(config.train_data_dir, config.batch_size, config.min_length, 'train', speakers, num_workers=config.num_workers,few_shot = config.few_shot)
     test_loader = TestDataset(config.test_data_dir, config.wav_dir, speakers, src_spk=config.test_src_spk, trg_spk=config.test_trg_spk)
 
     # Solver for training and testing StarGAN.
@@ -62,6 +62,7 @@ if __name__ == '__main__':
     parser.add_argument('--beta1', type=float, default=0.5, help='beta1 for Adam optimizer')
     parser.add_argument('--beta2', type=float, default=0.999, help='beta2 for Adam optimizer')
     parser.add_argument('--resume_iters', type=int, default=None, help='resume training from this step')
+    parser.add_argument('--few_shot', default = None, type = int, help = 'few shot learning')
 
     # Test configuration.
     parser.add_argument('--test_iters', type=int, default=100000, help='test model from this step')

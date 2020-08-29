@@ -286,12 +286,12 @@ class SPEncoderPool(nn.Module):
             nn.LeakyReLU(0.02),
         )
         '''
-        #self.linear1 = nn.Linear(256, 128)
+        self.linear1 = nn.Linear(512, 128)
         
-        self.unshared = nn.ModuleList()
+        #self.unshared = nn.ModuleList()
 
-        for _ in range(num_speakers):
-            self.unshared += [nn.Linear(512, 128)]
+        #for _ in range(num_speakers):
+        #    self.unshared += [nn.Linear(512, 128)]
         
         if self.cls:
             self.cls_layer = nn.Linear(128, num_speakers)
@@ -319,7 +319,8 @@ class SPEncoderPool(nn.Module):
         
         out = torch.cat([out_mean, out_std], dim = 1) 
         
-        #out = self.linear1(out)
+        s = self.linear1(out)
+        '''
         res = []
         for layer in self.unshared:
             
@@ -329,7 +330,7 @@ class SPEncoderPool(nn.Module):
         
         idx = torch.LongTensor(range(x.size(0))).to(x.device)
         s = res[idx, trg_c.long()]
-        
+        '''
         if self.cls and cls_out:
             cls_out = self.cls_layer(s)
             return s, cls_out

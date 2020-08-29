@@ -30,7 +30,7 @@ def main(config):
     # Data loader.
     #train_loader = get_loader(config.train_data_dir, config.batch_size, config.min_length, 'train', speakers, num_workers=config.num_workers,)
     
-    train_dataset = PairDataset(config.train_data_dir, speakers, config.min_length)
+    train_dataset = PairDataset(config.train_data_dir, speakers, config.min_length, config.few_shot)
     train_loader = data.DataLoader(dataset=train_dataset,
                                   batch_size=config.batch_size,
                                   shuffle=(config.mode=='train'),
@@ -78,6 +78,7 @@ if __name__ == '__main__':
     parser.add_argument('--resume_iters', type=int, default=None, help='resume training from this step')
     parser.add_argument('--device', type=int, default=0, help='choosing cuda device')
     parser.add_argument('--spk_cls', default = False, action = 'store_true', help = 'if or not use spk cls loss for SPEncoder module')
+    parser.add_argument('--few_shot', default = None, type = int, help = 'few shot learning')
 
     # Test configuration.
     parser.add_argument('--test_iters', type=int, default=100000, help='test model from this step')

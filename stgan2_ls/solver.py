@@ -45,7 +45,7 @@ class Solver(object):
 
         # Miscellaneous.
         self.use_tensorboard = config.use_tensorboard
-        self.device = torch.device(f'cuda:{config.device}' if torch.cuda.is_available() else 'cpu')
+        self.device = torch.device(f'cuda' if torch.cuda.is_available() else 'cpu')
 
         # Directories.
         self.log_dir = config.log_dir
@@ -158,7 +158,7 @@ class Solver(object):
         data_iter = iter(train_loader)
 
         # Read a batch of testdata
-        test_wavfiles = self.test_loader.get_batch_test_data(batch_size=4)
+        test_wavfiles = self.test_loader.get_batch_test_data(batch_size=10)
         test_wavs = [self.load_wav(wavfile, sr = self.sampling_rate) for wavfile in test_wavfiles]
 
         # Determine whether do copysynthesize when first do training-time conversion test.
