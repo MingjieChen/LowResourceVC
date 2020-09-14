@@ -61,9 +61,12 @@ if __name__ == '__main__':
     parser.add_argument('--lambda_id', type=float, default=5, help='weight for id mapping loss')
     parser.add_argument('--lambda_spid', type=float, default=5, help='weight for id mapping loss')
     parser.add_argument('--sampling_rate', type=int, default=16000, help='sampling rate')
+    
+    # modules
     parser.add_argument('--discriminator', type = str, default = 'PatchDiscriminator')
     parser.add_argument('--spenc', type = str, default = 'SPEncoder')
-       
+    parser.add_argument('--drop_affine', default = True, action = 'store_false', help = 'use affine in Generator IN layers')   
+    parser.add_argument('--generator', type = str, default = 'Generator')
     # Training configuration.
     parser.add_argument('--batch_size', type=int, default=8, help='mini-batch size')
     parser.add_argument('--min_length', type=int, default=256 )

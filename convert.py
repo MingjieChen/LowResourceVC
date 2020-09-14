@@ -3,8 +3,11 @@ import argparse
 #from stgan.model import Generator
 #from model2 import Generator as Generator2
 from stgan.model import Generator as Gen
+
 from stgan2_ls.model import Generator as LSGen
 from stgan_adain.model import Generator as AdaGen
+from stgan_adain.model import GeneratorSplit  as AdaGenSplit
+from stgan_adain.model import Generator2D as AdaGen2D
 from stgan_adain.model import SPEncoder as SPEncoder
 from stgan_adain.model import SPEncoderPool
 from stgan_adain.model import SPEncoderPool1D
@@ -64,6 +67,7 @@ class TestDataset(object):
 
         # find source speakers all mc files
         self.mc_files = sorted(glob.glob(join(config.test_data_dir, f'{self.src_spk}*.npy')))
+        self.trg_mc_files = sorted(glob.glob(join(config.test_data_dir, f'{self.trg_spk}*.npy')))
         self.src_spk_stats = np.load(join(config.train_data_dir, f'{self.src_spk}_stats.npz'))
         self.src_wav_dir = f'{config.wav_dir}/{self.src_spk}'
         self.trg_wav_dir = f'{config.wav_dir}/{self.trg_spk}'
@@ -96,15 +100,17 @@ class TestDataset(object):
         if batch_size is None:
             batch_size = len(self.mc_files)
         batch_data = []
+        trg_mcfile = self.trg_mc_files[0]
         for i in range(batch_size):
             mcfile = self.mc_files[i]
             filename = basename(mcfile)
             #if exists( join( self.trg_wav_dir, self.trg_spk + '_' + filename.split('_')[1].replace('npy','wav') ) )   :
             #    refwav_path = join(self.trg_wav_dir, self.trg_spk + '_' +filename.split('_')[1].replace('npy','wav'))
             #else:
-            refwav_path = join(self.trg_wav_dir, os.listdir(self.trg_wav_dir)[0])
+            #refwav_path = join(self.trg_wav_dir, os.listdir(self.trg_wav_dir)[0])
             wavfile_path = join(self.src_wav_dir, self.src_spk + '_' + filename.split('_')[1].replace('npy', 'wav'))
-            batch_data.append((wavfile_path, refwav_path))
+            #batch_data.append((wavfile_path, refwav_path))
+            batch_data.append((wavfile_path, trg_mcfile))
         return batch_data 
 
 
@@ -116,11 +122,12 @@ def load_wav(wavfile, sr=16000):
 
 def process_test_loader(test_loader, G, device, sampling_rate, num_mcep, frame_period, spk2emb, config, sp_enc):
     test_wavfiles = test_loader.get_batch_test_data(batch_size=config.num_converted_wavs)
-    test_wavs = [(load_wav(wavfile, sampling_rate), ref_wav, load_wav(ref_wav, sampling_rate) ) for wavfile, ref_wav in test_wavfiles]
+    test_wavs = [(load_wav(wavfile, sampling_rate), trg_mc_path ) for wavfile, trg_mc_path in test_wavfiles]
     pair_list = []
     with torch.no_grad():
-        for idx, (wav, ref, ref_wav)  in enumerate(test_wavs):
-            print(len(wav), flush=True)
+        for idx, (wav, trg_mc)  in enumerate(test_wavs):
+            print(f'len source wav {len(wav)} trg mc path {trg_mc}', flush=True)
+
             wav_name = basename(test_wavfiles[idx][0])
             
             # print(wav_name)
@@ -144,11 +151,12 @@ def process_test_loader(test_loader, G, device, sampling_rate, num_mcep, frame_p
             if sp_enc is not None:
                 if not config.use_spk_mean:
                     
-                    _, _, ref_sp, _ = world_decompose(wav = ref_wav, fs = sampling_rate, frame_period = frame_period)
-                    coded_ref_sp = world_encode_spectral_envelop(sp = ref_sp, fs = sampling_rate, dim = num_mcep)
-                    coded_ref_sp_norm = (coded_ref_sp - test_loader.mcep_mean_trg) / test_loader.mcep_std_trg
+                    #_, _, ref_sp, _ = world_decompose(wav = ref_wav, fs = sampling_rate, frame_period = frame_period)
+                    #coded_ref_sp = world_encode_spectral_envelop(sp = ref_sp, fs = sampling_rate, dim = num_mcep)
+                    #coded_ref_sp_norm = (coded_ref_sp - test_loader.mcep_mean_trg) / test_loader.mcep_std_trg
+                    #coded_ref_sp_norm_tensor = torch.FloatTensor(coded_ref_sp_norm.T).unsqueeze_(0).unsqueeze_(1).to(device)
+                    coded_ref_sp_norm = np.load(trg_mc)
                     coded_ref_sp_norm_tensor = torch.FloatTensor(coded_ref_sp_norm.T).unsqueeze_(0).unsqueeze_(1).to(device)
-                    
                     trg_spk_cond = sp_enc(coded_ref_sp_norm_tensor, trg_spk_label)    
                     src_spk_cond = sp_enc(coded_sp_norm_tensor, org_spk_label )
                 else:
@@ -181,7 +189,7 @@ def process_test_loader(test_loader, G, device, sampling_rate, num_mcep, frame_p
             librosa.output.write_wav(join(config.convert_dir, str(config.resume_iters),
                 cvt_wav_path), wav_transformed, sampling_rate)
             
-            pair_list.append((join(config.convert_dir, str(config.resume_iters), cvt_wav_path), ref))
+            pair_list.append((join(config.convert_dir, str(config.resume_iters), cvt_wav_path), trg_mc))
 
 
             
@@ -218,20 +226,18 @@ def test(config):
     sampling_rate, num_mcep, frame_period= config.sample_rate, 36, 5
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
-    G = eval(config.generator)(num_speakers = config.num_speakers).to(device)
+    if config.generator.startswith('AdaGen'):
+        G = eval(config.generator)(num_speakers = config.num_speakers, aff = config.drop_affine).to(device)
+    elif config.generator == 'LSGen':   
+        G = eval(config.generator)(num_speakers = config.num_speakers).to(device)
     # Restore model
     print(f'Loading the trained models from step {config.resume_iters}...', flush=True)
     G_path = join(config.model_save_dir, f'{config.resume_iters}-G.ckpt')
     G.load_state_dict(torch.load(G_path, map_location=lambda storage, loc: storage))
     G.eval()
     
-    if config.generator == 'AdaGen':
+    if config.generator.startswith('AdaGen'):
         sp_enc = eval(config.spenc)(num_speakers = config.num_speakers,spk_cls = config.spk_cls ).to(device)
-        sp_path = join(config.model_save_dir, f'{config.resume_iters}-sp.ckpt')
-        sp_enc.load_state_dict(torch.load(sp_path, map_location=lambda storage, loc: storage))
-        sp_enc.eval()
-    elif config.generator == 'AdaGenGSE':
-        sp_enc = SPEncoderGSE(num_speakers = config.num_speakers).to(device)
         sp_path = join(config.model_save_dir, f'{config.resume_iters}-sp.ckpt')
         sp_enc.load_state_dict(torch.load(sp_path, map_location=lambda storage, loc: storage))
         sp_enc.eval()
@@ -314,6 +320,8 @@ if __name__ == '__main__':
     parser.add_argument('--generator', type=str, default='Generator')
     parser.add_argument('--spenc', type = str, default = 'SPEncoder')
     parser.add_argument('--spk_cls', default = False, action = 'store_true')
+    parser.add_argument('--drop_affine', default = True, action = 'store_false')
+    
     # Directories.
     parser.add_argument('--train_data_dir', type=str, default='./data/mc/train')
     parser.add_argument('--test_data_dir', type=str, default='./data/mc/test')

@@ -8,12 +8,12 @@ PYTHON=/share/mini1/sw/std/python/anaconda3-2019.07/v3.7/envs/torch_0.4/bin/pyth
 #exp=exp/0705stada_doub0/
 root=/share/mini1/res/t/vc/studio/timap-en/vctk/
 wav_dir=$root/resmp_wav22050/
-#mc_dir=$root/dump/0721mc_10spk_22050/
-mc_dir=$root/dump/0825mc_109spk_22050
-num_spks=109
+mc_dir=$root/dump/0721mc_10spk_22050/
+#mc_dir=$root/dump/0825mc_109spk_22050
+num_spks=10
 exp_root=/share/mini1/res/t/vc/studio/timap-en/vctk/exp/vc-gan/
 #exp_name=0731stgan_gse_0/a
-exp_name=0829stgan3_1
+exp_name=0914stgan3_1
 #exp_name=0801stgan_gse_1/
 #exp_name=0811stadain_map_2
 
@@ -38,23 +38,24 @@ $PYTHON $main_script \
                     --num_workers 8 \
                     --n_critic 1\
                     --d_lr 0.0001\
-                    --g_lr 0.0001\
-                    --lambda_id 2.0  \
+                    --g_lr 0.0002\
+                    --lambda_id 0   \
                     --lambda_gp 1.0 \
-                    --lambda_rec 4.0 \
-                    --lambda_adv 1.0 \
-                    --lambda_spid 1.0 \
-                    --lambda_cls 0.1  \
+                    --lambda_rec 2 \
+                    --lambda_adv 1 \
+                    --lambda_spid 1 \
+                    --lambda_cls 0.0  \
                     --min_length 256 \
-                    --test_src_spk p229 \
-                    --test_trg_spk p232 \
+                    --test_src_spk p232 \
+                    --test_trg_spk p229 \
                     --sampling_rate 22050 \
                     --speaker_path $mc_dir/speaker_used.json \
+                    --generator GeneratorSplit\
                     --discriminator PatchDiscriminator \
-                    --spenc SPEncoderPool \
+                    --spenc SPEncoder \
                     --batch_size 8 \
                     --drop_id_step 10000\
-                    --few_shot 20 \
-                    --spk_cls \
-                    #--resume_iters 120000\
+                    #--resume_iters 100000\
+                    #--few_shot 20 \
+                    #--spk_cls \
                    

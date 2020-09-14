@@ -1,9 +1,13 @@
 from stgan_adain.model import Generator
+from stgan_adain.model import GeneratorSplit
+from stgan_adain.model import Generator2D
 from stgan_adain.model import PatchDiscriminator 
 from stgan_adain.model import Discriminator
 from stgan_adain.model import SPEncoder
 from stgan_adain.model import SPEncoderPool 
 from stgan_adain.model import SPEncoderPool1D
+from stgan_adain.model import SPEncoderTDNNPool
+from stgan_adain.resnet_speaker_encoder import ResSPEncoder
 import torch
 import torch.nn.functional as F
 from os.path import join, basename
@@ -28,7 +32,7 @@ class Solver(object):
         # submodules
         self.D_name = config.discriminator
         self.SPE_name = config.spenc
-
+        self.G_name = config.generator
         # Model configurations.
         self.num_speakers = config.num_speakers
         self.lambda_rec = config.lambda_rec
@@ -39,7 +43,7 @@ class Solver(object):
         self.lambda_cls = config.lambda_cls
         self.drop_id_step = config.drop_id_step
         self.spk_cls = config.spk_cls
-
+        self.drop_affine = config.drop_affine
         # Training configurations.
         self.batch_size = config.batch_size
         self.num_iters = config.num_iters
@@ -76,7 +80,7 @@ class Solver(object):
 
     def build_model(self):
         """Create a generator and a discriminator."""
-        self.generator = Generator(num_speakers=self.num_speakers)
+        self.generator = eval(self.G_name)(num_speakers=self.num_speakers, aff = self.drop_affine)
         self.discriminator = eval(self.D_name)(num_speakers=self.num_speakers)
         self.sp_enc = eval(self.SPE_name)(num_speakers = self.num_speakers, spk_cls = self.spk_cls)
 
@@ -309,12 +313,21 @@ class Solver(object):
                 mc_fake_id = self.generator(mc_src, spk_c_org, spk_c_org)
                 g_loss_id = torch.mean(torch.abs(mc_src - mc_fake_id))
                 
-                # style encoder id loss
+                # style encoder contrastive loss
 
                 mc_fake_style_c = self.sp_enc(mc_fake, spk_label_trg)
-                mc_src_style_c = self.sp_enc(mc_reconst, spk_label_trg)
-                g_loss_stid = torch.mean(torch.abs(mc_fake_style_c - spk_c_trg))
+                #mc_src_style_c = self.sp_enc(mc_reconst, spk_label_trg)
+                g_loss_stid = torch.mean(torch.abs(mc_fake_style_c - spk_c_trg ))
                 
+                #logits_pos = torch.bmm(mc_fake_style_c.view(mc_src.size(0), 1, -1), spk_c_trg.view(mc_src.size(0), -1, 1))
+                #logits_neg = torch.bmm(mc_fake_style_c.view(mc_src.size(0), 1, -1), spk_c_org.view(mc_src.size(0), -1, 1))
+                #logits = torch.cat([logits_pos, logits_neg], dim = 1)
+                #zeros = torch.zeros(mc_src.size(0),1, dtype = torch.long).to(mc_src.device)
+                #g_loss_stid = F.cross_entropy(logits/ 0.1, zeros)
+
+                #g_loss_ms = torch.mean(torch.abs(mc_fake - mc_src)) /  torch.mean(torch.abs(spk_c_trg.detach() - spk_c_org.detach()))
+                #g_loss_ms = 1/ (g_loss_ms + 1e-5)
+
                 #g_loss_stid = torch.log(torch.mean(torch.abs(mc_fake_style_c - spk_c_trg.detach()))) -torch.log( torch.mean(torch.abs(mc_src_style_c - spk_c_org.detach())) )
 
                 if i> self.drop_id_step:
@@ -323,7 +336,8 @@ class Solver(object):
                 g_loss = self.lambda_adv *  g_loss_fake \
                     + self.lambda_rec * g_loss_rec \
                     + self.lambda_id * g_loss_id \
-                    + self.lambda_spid * g_loss_stid
+                    + self.lambda_spid * g_loss_stid\
+                    #+ g_loss_ms
                 
                 if self.spk_cls:
                     g_loss += self.lambda_cls * cls_loss
@@ -334,7 +348,7 @@ class Solver(object):
                 # Logging.
                 loss['G/loss_fake'] = g_loss_fake.item()
                 loss['G/loss_rec'] = g_loss_rec.item()
-                #loss['G/loss'] = g_loss.item()
+                #loss['G/loss_ms'] = g_loss_ms.item()
                 loss['G/loss_id'] = g_loss_id.item()
                 loss['G/loss_stid'] = g_loss_stid.item()
                 if self.spk_cls:

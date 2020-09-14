@@ -11,7 +11,7 @@ wav_dir=$root/resmp_wav22050/
 mc_dir=$root/dump/0825mc_109spk_22050
 
 exp_root=/share/mini1/res/t/vc/studio/timap-en/vctk/exp/vc-gan/
-exp_name=0827stgan2_0/
+exp_name=0908stgan2_0/
 exp=$exp_root/$exp_name
 
 
@@ -31,11 +31,11 @@ main_script=$root/vc-gan/main_st2ls.py
                     --lambda_id 5.0 \
                     --drop_id_step 10000 \
                     --min_length 256 \
-                    --test_src_spk p229 \
-                    --test_trg_spk p232 \
+                    --test_src_spk p232 \
+                    --test_trg_spk p293 \
                     --sampling_rate 22050 \
                     --speaker_path $mc_dir/speaker_used.json \
                     --batch_size 8 \
                     --few_shot 20\
-                    --resume_iters 130000
+                    --resume_iters 80000
                    

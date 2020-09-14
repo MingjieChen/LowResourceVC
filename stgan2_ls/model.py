@@ -90,7 +90,7 @@ class ResidualBlock(nn.Module):
         super(ResidualBlock, self).__init__()
         self.conv_1 = nn.Conv1d(dim_in, dim_out, kernel_size=3, stride=1, padding=1, bias = False)
         self.cin_1 = ConditionalInstanceNormalisation(dim_out, style_num)
-        self.relu_1 = GLU()
+        self.relu_1 = nn.GLU(dim = 1)
 
         
         #self.conv1 = nn.Conv1d(dim_in, dim_out, kernel_size = 3, stride = 1, padding =1)
@@ -113,7 +113,7 @@ class ResidualBlock(nn.Module):
         #return conv * torch.sigmoid(gate)
         return x_
 
-
+'''
 class Generator(nn.Module):
     """Generator network."""
     def __init__(self, num_speakers=4, device = None):
@@ -131,7 +131,6 @@ class Generator(nn.Module):
             nn.Conv2d(in_channels=128, out_channels=256, kernel_size=(4, 8), stride=(2, 2), padding=(1, 3), bias=False),
             nn.InstanceNorm2d(num_features=256, affine=True),
             GLU()
-            #nn.GLU(dim=1)
         )
         
         #self.down_sample_2 = GDown(128, 256, kernel_size = (4,8), stride = (2,2), padding = (2,3))
@@ -178,13 +177,123 @@ class Generator(nn.Module):
         # Up-sampling layers.
         self.up_sample_1 = nn.Sequential(
             nn.ConvTranspose2d(in_channels=256, out_channels=256, kernel_size=4, stride=2, padding=1, bias=False),
+            #nn.InstanceNorm2d(num_features = 256, affine = True),
             GLU()
         )
         #self.up_sample_1 = GUp(256, 256, kernel_size = 4, stride = 2, padding =1)
         
         self.up_sample_2 = nn.Sequential(
             nn.ConvTranspose2d(in_channels=256, out_channels=128, kernel_size=4, stride=2, padding=1, bias=False),
+            #nn.InstanceNorm2d(num_features = 256, affine = True),
             GLU()
+        )
+
+        #self.up_sample_2 = GUp(256, 128, kernel_size = 4, stride = 2, padding= 1)
+
+        # Out.
+        self.out = nn.Conv2d(in_channels=128, out_channels=1, kernel_size=(5,15), stride=1, padding=(2,7), bias=False)
+
+    def forward(self, x, c_src, c_trg):
+        width_size = x.size(3)
+
+        x = self.down_sample_1(x)
+        x = self.down_sample_2(x)
+        x = self.down_sample_3(x)
+
+        x = x.contiguous().view(-1, 2304, width_size // 4)
+        x = self.down_conversion(x)
+
+        x = self.residual_1(x, c_src, c_trg)
+        x = self.residual_2(x, c_src, c_trg)
+        x = self.residual_3(x, c_src, c_trg)
+        x = self.residual_4(x, c_src, c_trg)
+        x = self.residual_5(x, c_src, c_trg)
+        x = self.residual_6(x, c_src, c_trg)
+        x = self.residual_7(x, c_src, c_trg)
+        x = self.residual_8(x, c_src, c_trg)
+        x = self.residual_9(x, c_src, c_trg)
+
+        x = self.up_conversion(x)
+        x = x.view(-1, 256, 9, width_size // 4)
+
+        x = self.up_sample_1(x)
+        x = self.up_sample_2(x)
+        x = self.out(x)
+
+        return x
+'''
+class Generator(nn.Module):
+    """Generator network."""
+    def __init__(self, num_speakers=4, device = None):
+        super(Generator, self).__init__()
+        #self.device = device
+        # Down-sampling layers
+        self.down_sample_1 = nn.Sequential(
+            nn.Conv2d(in_channels=1, out_channels=256, kernel_size=(3, 9), padding=(1, 4), bias=False),
+            nn.GLU(dim = 1)
+        )
+        
+        #self.down_sample_1 = GDown(1, 128, kernel_size = (3,9), stride = 1, padding = (1,4))
+
+        self.down_sample_2 = nn.Sequential(
+            nn.Conv2d(in_channels=128, out_channels=512, kernel_size=(4, 8), stride=(2, 2), padding=(1, 3), bias=False),
+            nn.InstanceNorm2d(num_features=512, affine=True),
+            nn.GLU(dim = 1)
+        )
+        
+        #self.down_sample_2 = GDown(128, 256, kernel_size = (4,8), stride = (2,2), padding = (2,3))
+
+        self.down_sample_3 = nn.Sequential(
+            nn.Conv2d(in_channels=256, out_channels=512, kernel_size=(4, 8), stride=(2, 2), padding=(1, 3), bias=False),
+            nn.InstanceNorm2d(num_features=512, affine=True),
+            nn.GLU(dim = 1)
+        )
+        
+        #self.down_sample_3 = GDown(256, 256, kernel_size = (4,8), stride = (2,2), padding = (1,3))
+
+
+        # Down-conversion layers.
+        self.down_conversion = nn.Sequential(
+            nn.Conv1d(in_channels=2304,
+                      out_channels=256,
+                      kernel_size=1,
+                      stride=1,
+                      padding=0,
+                      bias=False),
+            nn.InstanceNorm1d(num_features=256, affine=True)
+        )
+
+        # Bottleneck layers.
+        self.residual_1 = ResidualBlock(dim_in=256, dim_out=512, style_num=num_speakers)
+        self.residual_2 = ResidualBlock(dim_in=256, dim_out=512, style_num=num_speakers)
+        self.residual_3 = ResidualBlock(dim_in=256, dim_out=512, style_num=num_speakers)
+        self.residual_4 = ResidualBlock(dim_in=256, dim_out=512, style_num=num_speakers)
+        self.residual_5 = ResidualBlock(dim_in=256, dim_out=512, style_num=num_speakers)
+        self.residual_6 = ResidualBlock(dim_in=256, dim_out=512, style_num=num_speakers)
+        self.residual_7 = ResidualBlock(dim_in=256, dim_out=512, style_num=num_speakers)
+        self.residual_8 = ResidualBlock(dim_in=256, dim_out=512, style_num=num_speakers)
+        self.residual_9 = ResidualBlock(dim_in=256, dim_out=512, style_num=num_speakers)
+
+        # Up-conversion layers.
+        self.up_conversion = nn.Conv1d(in_channels=256,
+                                       out_channels=2304,
+                                       kernel_size=1,
+                                       stride=1,
+                                       padding=0,
+                                       bias=False)
+
+        # Up-sampling layers.
+        self.up_sample_1 = nn.Sequential(
+            nn.ConvTranspose2d(in_channels=256, out_channels=512, kernel_size=4, stride=2, padding=1, bias=False),
+            nn.InstanceNorm2d(num_features = 512, affine = True),
+            nn.GLU(dim = 1)
+        )
+        #self.up_sample_1 = GUp(256, 256, kernel_size = 4, stride = 2, padding =1)
+        
+        self.up_sample_2 = nn.Sequential(
+            nn.ConvTranspose2d(in_channels=256, out_channels=256, kernel_size=4, stride=2, padding=1, bias=False),
+            nn.InstanceNorm2d(num_features = 256, affine = True),
+            nn.GLU(dim = 1)
         )
 
         #self.up_sample_2 = GUp(256, 128, kernel_size = 4, stride = 2, padding= 1)
@@ -255,6 +364,7 @@ class DisDown(nn.Module):
         gate = self.gate_norm(gate)
 
         return conv * torch.sigmoid(gate)
+'''
 class Discriminator(nn.Module):
     """Discriminator network."""
     def __init__(self, device, num_speakers=10):
@@ -331,14 +441,85 @@ class Discriminator(nn.Module):
         x = x.view(x.size(0), -1)
         #x = torch.cat([x ,in_prod], dim = -1)
         x = torch.mean(x, dim=-1) + torch.mean(in_prod, dim = -1)    
-        '''
-        # old dis
-        x = self.fully_connected(h)
+        #x = torch.sigmoid(x)
+        return x
+'''
+class Discriminator(nn.Module):
+    """Discriminator network."""
+    def __init__(self, device, num_speakers=10):
+        super(Discriminator, self).__init__()
 
-        p = self.projection(c_onehot)
+        self.num_speakers = num_speakers
+        #self.device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
+        self.device = device
+        # Initial layers.
+        self.conv_layer_1 = nn.Sequential(
+            nn.Conv2d(in_channels=1, out_channels=256, kernel_size=(3, 3), stride=(1, 1), padding=1),
+            nn.GLU(dim = 1)
+        )
+        #self.conv1 = nn.Conv2d(1, 128, kernel_size= (3,3), stride = 1, padding= 1)
+        #self.gate1 = nn.Conv2d(1, 128, kernel_size = 3, stride = 1, padding = 1)
 
-        x += torch.sum(p * h, dim=1, keepdim=True)
-        '''
+        # Down-sampling layers.
+        self.down_sample_1 = nn.Sequential(
+            nn.Conv2d(in_channels=128, out_channels=512, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False),
+            nn.InstanceNorm2d(512, affine = True),
+            nn.GLU(dim = 1)
+        )
+        #self.down_sample_1 = DisDown(128, 256, kernel_size = 3, stride = 2, padding = 1)
+
+        self.down_sample_2 = nn.Sequential(
+            nn.Conv2d(in_channels=256, out_channels=1024, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False),
+            nn.InstanceNorm2d(1024, affine = True),
+            nn.GLU(dim = 1)
+        )
+        #self.down_sample_2 = DisDown(256, 512, kernel_size = 3, stride = 2, padding = 1)
+        
+        self.down_sample_3 = nn.Sequential(
+            nn.Conv2d(in_channels=512, out_channels=2048, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False),
+            nn.InstanceNorm2d(2048, affine = True),
+            nn.GLU(dim = 1)
+        )
+        #self.down_sample_3 = DisDown(512, 1024, kernel_size = 3, stride = 2, padding = 1)
+        self.down_sample_4 = nn.Sequential(
+            nn.Conv2d(in_channels=1024, out_channels=1024, kernel_size=(1, 5), stride=(1, 1), padding=(0, 2), bias=False),
+            nn.GLU(dim = 1)
+        )
+        #self.down_sample_4 = DisDown(1024, 512, kernel_size = (1,5), stride = 1, padding = (0,2))
+        # Fully connected layer.
+        self.fully_connected = nn.Linear(in_features=512, out_features=1)
+        #self.fully_connected = nn.Linear(in_features=512, out_features=512)
+
+        # Projection.
+        #self.projection = nn.Linear(self.num_speakers, 512)
+        self.projection = nn.Linear(2*self.num_speakers, 512)
+
+    def forward(self, x, c, c_):
+        c_onehot = torch.cat((c, c_), dim=1).to(self.device)
+        #c_onehot = c_
+
+        x = self.conv_layer_1(x)
+        #x_conv = self.conv1(x)
+        #x_gate = self.gate1(x)
+        #out = x_conv * torch.sigmoid(x_gate)
+
+        x = self.down_sample_1(x)
+        x = self.down_sample_2(x)
+        x = self.down_sample_3(x)
+        x_ = self.down_sample_4(x)
+
+        h = torch.sum(x_, dim=(2, 3)) # b 512
+
+        #x = self.fully_connected(h)
+        x = self.fully_connected(x_.permute(0,2,3,1)).permute(0,3,1,2) # b 1 h w
+
+        p = self.projection(c_onehot) #b 512
+
+        in_prod = p * h
+        
+        x = x.view(x.size(0), -1)
+        #x = torch.cat([x ,in_prod], dim = -1)
+        x = torch.mean(x, dim=-1) + torch.mean(in_prod, dim = -1)    
         #x = torch.sigmoid(x)
         return x
 

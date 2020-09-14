@@ -68,7 +68,7 @@ class PairDataset(data.Dataset):
             
             _spk_files = glob.glob(join(data_dir, f'{spk}*.npy'))
             
-            mc_files = self.rm_too_short_utt(_spk_files, min_length)
+            mc_files = self.rm_too_short_utt(_spk_files, min_length, few_shot)
 
             if few_shot is not None:
                 assert isinstance(few_shot, int)
@@ -92,12 +92,15 @@ class PairDataset(data.Dataset):
                 print(f)
                 raise RuntimeError(f"The data may be corrupted! We need all MCEP features having more than {min_length} frames!") 
         
-    def rm_too_short_utt(self, mc_files, min_length):
+    def rm_too_short_utt(self, mc_files, min_length, few_shot = None):
         new_mc_files = []
         for mcfile in mc_files:
             mc = np.load(mcfile)
             if mc.shape[0] > min_length:
                 new_mc_files.append(mcfile)
+            # only read in few_shot samples, reduce preprocessing time
+            if few_shot is not None and len(new_mc_files) > few_shot:
+                break
         return new_mc_files
 
     def sample_seg(self, feat, sample_len=None):
@@ -218,7 +221,7 @@ class MyDataset(data.Dataset):
             # [0827 new feature]: add few shot learning feature, limit training samples
             if few_shot is not None:
                 mc_dirs = list(glob.glob(join(data_dir, f'{spk}_*.npy')))
-                mc_dirs = self.rm_too_short_utt(mc_dirs, min_length)
+                mc_dirs = self.rm_too_short_utt(mc_dirs, min_length, few_shot = few_shot)
                 
                 assert isinstance(few_shot, int)
                 assert few_shot < len(mc_dirs)
@@ -255,12 +258,16 @@ class MyDataset(data.Dataset):
             n_frames += frms
         duration = (n_frames * frame_rate) / 1000.0
         return duration
-    def rm_too_short_utt(self, mc_files, min_length):
+    def rm_too_short_utt(self, mc_files, min_length, few_shot = None):
         new_mc_files = []
         for mcfile in mc_files:
             mc = np.load(mcfile)
             if mc.shape[0] > min_length:
                 new_mc_files.append(mcfile)
+            
+            # [0908 new feature] reduce reduntant calculation for few shot learning    
+            if few_shot is not None and len(new_mc_files) > few_shot:
+                break
         return new_mc_files
 
     def sample_seg(self, feat, sample_len=None):
@@ -329,7 +336,8 @@ class PairTestDataset(object):
             filename = basename(mcfile)
             wavfile_path = join(self.src_wav_dir, filename.replace('npy', 'wav'))
             
-            trg_index = np.random.randint(0, len(self.trg_mc_files))
+            #trg_index = np.random.randint(0, len(self.trg_mc_files))
+            trg_index = 0
             trg_mc_file = self.trg_mc_files[trg_index]
             trg_mc = np.load(trg_mc_file)
             src_mc = np.load(mcfile)

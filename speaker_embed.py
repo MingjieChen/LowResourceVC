@@ -120,7 +120,7 @@ def plot_embedding(config, X, y, idx):
     if config.num_speakers == 10:
         division = 10.0
     elif config.num_speakers == 109:
-        division = 100.0
+        division = 1000.0
     else:
         raise Exception(f'not support num_speakers {config.num_speakers}')
     for i in range(X.shape[0]):
