@@ -4,7 +4,7 @@ import numpy as np
 import argparse
 from data_loader import get_loader, to_categorical
 import torch.nn.functional as F
-from stgan_adain.stylegan2_module import Style2ResidualBlock, Style2ResidualBlock1D
+from stgan_adain.stylegan2_module import Style2ResidualBlock, Style2ResidualBlock1D, Style2ResidualBlock1DSrc, Style2ResidualBlock1DBeta
 class GLU(nn.Module):
     ''' GLU block, do not split channels dimension'''
 
@@ -596,7 +596,7 @@ class SPEncoder(nn.Module):
 
 class Generator2D(nn.Module):
     """Generator network."""
-    def __init__(self, num_speakers=4, aff = True):
+    def __init__(self, num_speakers=4, aff = True, res_block_name = ''):
         super(Generator2D, self).__init__()
         # Down-sampling layers
         '''
@@ -728,9 +728,10 @@ class Generator2D(nn.Module):
 
 class GeneratorSplit(nn.Module):
     """Generator network."""
-    def __init__(self, num_speakers=4, aff = True):
+    def __init__(self, num_speakers=4, aff = True, res_block_name = 'ResidualBlockSplit'):
         super(GeneratorSplit, self).__init__()
         # Down-sampling layers
+        self.res_block_name = res_block_name 
         self.down_sample_1 = nn.Sequential(
             nn.Conv2d(in_channels=1, out_channels=256, kernel_size=(3, 9), padding=(1, 4), bias=False),
             nn.GLU(dim = 1),
@@ -758,7 +759,7 @@ class GeneratorSplit(nn.Module):
 
         # Bottleneck layers.
 
-        
+        '''
         self.residual_1 = ResidualBlockSplit(dim_in=256, dim_out=256)
         self.residual_2 = ResidualBlockSplit(dim_in=256, dim_out=256)
         self.residual_3 = ResidualBlockSplit(dim_in=256, dim_out=256)
@@ -770,6 +771,7 @@ class GeneratorSplit(nn.Module):
         self.residual_9 = ResidualBlockSplit(dim_in=256, dim_out=256)
         '''
         
+        '''
         self.residual_1 = Style2ResidualBlock1D(dim_in=256, dim_out=256)
         self.residual_2 = Style2ResidualBlock1D(dim_in=256, dim_out=256)
         self.residual_3 = Style2ResidualBlock1D(dim_in=256, dim_out=256)
@@ -780,6 +782,15 @@ class GeneratorSplit(nn.Module):
         self.residual_8 = Style2ResidualBlock1D(dim_in=256, dim_out=256)
         self.residual_9 = Style2ResidualBlock1D(dim_in=256, dim_out=256)
         '''
+        self.residual_1 = eval(self.res_block_name)(dim_in=256, dim_out=256)
+        self.residual_2 = eval(self.res_block_name)(dim_in=256, dim_out=256)
+        self.residual_3 = eval(self.res_block_name)(dim_in=256, dim_out=256)
+        self.residual_4 = eval(self.res_block_name)(dim_in=256, dim_out=256)
+        self.residual_5 = eval(self.res_block_name)(dim_in=256, dim_out=256)
+        self.residual_6 = eval(self.res_block_name)(dim_in=256, dim_out=256)
+        self.residual_7 = eval(self.res_block_name)(dim_in=256, dim_out=256)
+        self.residual_8 = eval(self.res_block_name)(dim_in=256, dim_out=256)
+        self.residual_9 = eval(self.res_block_name)(dim_in=256, dim_out=256)
         # Up-conversion layers.
         self.up_conversion = nn.Conv1d(in_channels=256,
                                        out_channels=2304,
@@ -839,25 +850,26 @@ class GeneratorSplit(nn.Module):
         return x
 class Generator(nn.Module):
     """Generator network."""
-    def __init__(self, num_speakers=4, aff = True):
+    def __init__(self, num_speakers=4, aff = True, res_block_name = ''):
         super(Generator, self).__init__()
+        self.res_block_name = res_block_name
         # Down-sampling layers
         self.down_sample_1 = nn.Sequential(
             nn.Conv2d(in_channels=1, out_channels=128, kernel_size=(3, 9), padding=(1, 4), bias=False),
-            #nn.LeakyReLU(0.2),
-            GLU()
+            nn.LeakyReLU(0.2),
+            #GLU()
         )
         self.down_sample_2 = nn.Sequential(
             nn.Conv2d(in_channels=128, out_channels=256, kernel_size=(4, 8), stride=(2, 2), padding=(1, 3), bias=False),
             nn.InstanceNorm2d(num_features=256, affine=aff),
-            #nn.LeakyReLU(0.2),
-            GLU()
+            nn.LeakyReLU(0.2),
+            #GLU()
         )
         self.down_sample_3 = nn.Sequential(
             nn.Conv2d(in_channels=256, out_channels=256, kernel_size=(4, 8), stride=(2, 2), padding=(1, 3), bias=False),
             nn.InstanceNorm2d(num_features=256, affine=aff),
-            #nn.LeakyReLU(0.2),
-            GLU()
+            nn.LeakyReLU(0.2),
+            #GLU()
         )
         # Down-conversion layers.
         self.down_conversion = nn.Sequential(
@@ -871,26 +883,15 @@ class Generator(nn.Module):
         )
 
         # Bottleneck layers.
-        self.residual_1 = ResidualBlock(dim_in=256, dim_out=256)
-        self.residual_2 = ResidualBlock(dim_in=256, dim_out=256)
-        self.residual_3 = ResidualBlock(dim_in=256, dim_out=256)
-        self.residual_4 = ResidualBlock(dim_in=256, dim_out=256)
-        self.residual_5 = ResidualBlock(dim_in=256, dim_out=256)
-        self.residual_6 = ResidualBlock(dim_in=256, dim_out=256)
-        self.residual_7 = ResidualBlock(dim_in=256, dim_out=256)
-        self.residual_8 = ResidualBlock(dim_in=256, dim_out=256)
-        self.residual_9 = ResidualBlock(dim_in=256, dim_out=256)
-        
-        
-        #self.residual_1 = Style2ResidualBlock1D(dim_in=256, dim_out=256)
-        #self.residual_2 = Style2ResidualBlock1D(dim_in=256, dim_out=256)
-        #self.residual_3 = Style2ResidualBlock1D(dim_in=256, dim_out=256)
-        #self.residual_4 = Style2ResidualBlock1D(dim_in=256, dim_out=256)
-        #self.residual_5 = Style2ResidualBlock1D(dim_in=256, dim_out=256)
-        #self.residual_6 = Style2ResidualBlock1D(dim_in=256, dim_out=256)
-        #self.residual_7 = Style2ResidualBlock1D(dim_in=256, dim_out=256)
-        #self.residual_8 = Style2ResidualBlock1D(dim_in=256, dim_out=256)
-        #self.residual_9 = Style2ResidualBlock1D(dim_in=256, dim_out=256)
+        self.residual_1 = eval(self.res_block_name)(dim_in=256, dim_out=256)
+        self.residual_2 = eval(self.res_block_name)(dim_in=256, dim_out=256)
+        self.residual_3 = eval(self.res_block_name)(dim_in=256, dim_out=256)
+        self.residual_4 = eval(self.res_block_name)(dim_in=256, dim_out=256)
+        self.residual_5 = eval(self.res_block_name)(dim_in=256, dim_out=256)
+        self.residual_6 = eval(self.res_block_name)(dim_in=256, dim_out=256)
+        self.residual_7 = eval(self.res_block_name)(dim_in=256, dim_out=256)
+        self.residual_8 = eval(self.res_block_name)(dim_in=256, dim_out=256)
+        self.residual_9 = eval(self.res_block_name)(dim_in=256, dim_out=256)
 
         # Up-conversion layers.
         self.up_conversion = nn.Conv1d(in_channels=256,
@@ -904,13 +905,13 @@ class Generator(nn.Module):
 
         self.up_sample_1 = nn.ConvTranspose2d(256, 256, kernel_size = 4, stride = 2, padding = 1)
         self.up_in_1 = nn.InstanceNorm2d(256, affine = True)
-        self.up_relu_1 = GLU()
-        #self.up_relu_1 = nn.LeakyReLU(0.2)
+        #self.up_relu_1 = GLU()
+        self.up_relu_1 = nn.LeakyReLU(0.2)
 
         self.up_sample_2 = nn.ConvTranspose2d(256, 128, kernel_size = 4, stride = 2, padding = 1 )
         self.up_in_2 = nn.InstanceNorm2d(128, affine = True)
-        self.up_relu_2 = GLU()
-        #self.up_relu_2 = nn.LeakyReLU(0.2)
+        #self.up_relu_2 = GLU()
+        self.up_relu_2 = nn.LeakyReLU(0.2)
         
         # Out.
         self.out = nn.Conv2d(in_channels=128, out_channels=1, kernel_size=7, stride=1, padding=3, bias=False)

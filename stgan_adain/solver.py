@@ -10,14 +10,14 @@ from stgan_adain.model import SPEncoderTDNNPool
 from stgan_adain.resnet_speaker_encoder import ResSPEncoder
 import torch
 import torch.nn.functional as F
-from os.path import join, basename
+from os.path import join, basename, exists
 import time
 import datetime
 from data_loader import to_categorical
 from utils import *
 from tqdm import tqdm
 import numpy as np
-
+import copy
 class Solver(object):
     """Solver for training and testing StarGAN."""
 
@@ -33,6 +33,7 @@ class Solver(object):
         self.D_name = config.discriminator
         self.SPE_name = config.spenc
         self.G_name = config.generator
+        self.res_block_name = config.res_block
         # Model configurations.
         self.num_speakers = config.num_speakers
         self.lambda_rec = config.lambda_rec
@@ -57,7 +58,6 @@ class Solver(object):
 
         # Test configurations.
         self.test_iters = config.test_iters
-
         # Miscellaneous.
         self.use_tensorboard = config.use_tensorboard
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -80,9 +80,13 @@ class Solver(object):
 
     def build_model(self):
         """Create a generator and a discriminator."""
-        self.generator = eval(self.G_name)(num_speakers=self.num_speakers, aff = self.drop_affine)
+        self.generator = eval(self.G_name)(num_speakers=self.num_speakers, aff = self.drop_affine, res_block_name = self.res_block_name)
         self.discriminator = eval(self.D_name)(num_speakers=self.num_speakers)
         self.sp_enc = eval(self.SPE_name)(num_speakers = self.num_speakers, spk_cls = self.spk_cls)
+        
+        # [0921 new feature]: add ema model ckpt for evaluation
+        self.generator_ema = copy.deepcopy(self.generator)
+        self.sp_enc_ema = copy.deepcopy(self.sp_enc)
 
         self.g_optimizer = torch.optim.Adam(list(self.generator.parameters()) + list(self.sp_enc.parameters()), self.g_lr, [self.beta1, self.beta2])
         self.d_optimizer = torch.optim.Adam(self.discriminator.parameters(), self.d_lr, [self.beta1, self.beta2])
@@ -103,6 +107,10 @@ class Solver(object):
         print(model, flush=True)
         print(name,flush=True)
         print("The number of parameters: {}".format(num_params), flush=True)
+    
+    def moving_average(self, model, model_test, beta = 0.999):
+        for param, param_test in zip(model.parameters(), model_test.parameters()):
+            param_test.data  = torch.lerp(param.data, param_test.data, beta)
 
     def restore_model(self, resume_iters):
         """Restore the trained generator and discriminator."""
@@ -110,10 +118,19 @@ class Solver(object):
         g_path = os.path.join(self.model_save_dir, '{}-G.ckpt'.format(resume_iters))
         d_path = os.path.join(self.model_save_dir, '{}-D.ckpt'.format(resume_iters))
         sp_path = os.path.join(self.model_save_dir, '{}-sp.ckpt'.format(resume_iters))
-
+        
+        # [0919 new feature]: save and restore optimizer
+        g_opt_path = os.path.join(self.model_save_dir, '{}-g_opt.ckpt'.format(resume_iters))
+        d_opt_path = os.path.join(self.model_save_dir, '{}-d_opt.ckpt'.format(resume_iters))
+        
         self.generator.load_state_dict(torch.load(g_path, map_location=lambda storage, loc: storage))
         self.discriminator.load_state_dict(torch.load(d_path, map_location=lambda storage, loc: storage))
         self.sp_enc.load_state_dict(torch.load(sp_path, map_location=lambda storage, loc: storage))
+        
+        if exists(g_opt_path):
+            self.g_optimizer.load_state_dict(torch.load(g_opt_path, map_location = lambda storage, loc: storage))
+        if exists(d_opt_path):
+            self.d_optimizer.load_state_dict(torch.load(d_opt_path, map_location = lambda storage, loc: storage))
 
     def build_tensorboard(self):
         """Build a tensorboard logger."""
@@ -353,7 +370,11 @@ class Solver(object):
                 loss['G/loss_stid'] = g_loss_stid.item()
                 if self.spk_cls:
                     loss['G/spk_cls'] = cls_loss.item()
-            
+                
+            # [0921 new feature]: add ema model ckpt for evaluation
+            self.moving_average(self.generator, self.generator_ema)
+            self.moving_average(self.sp_enc, self.sp_enc_ema)
+
             # =================================================================================== #
             #                                 4. Miscellaneous                                    #
             # =================================================================================== #
@@ -374,12 +395,23 @@ class Solver(object):
             # Save model checkpoints.
             if (i+1) % self.model_save_step == 0:
                 g_path = os.path.join(self.model_save_dir, '{}-G.ckpt'.format(i+1))
+                g_path_ema = os.path.join(self.model_save_dir, '{}-G.ckpt.ema'.format(i+1))
                 d_path = os.path.join(self.model_save_dir, '{}-D.ckpt'.format(i+1))
                 sp_path = os.path.join(self.model_save_dir, '{}-sp.ckpt'.format(i+1))
+                sp_path_ema = os.path.join(self.model_save_dir, '{}-sp.ckpt.ema'.format(i+1))
+                
 
+                # [0919 new feature]: save and restore optimizer
+                g_opt_path = os.path.join(self.model_save_dir, '{}-g_opt.ckpt'.format(i+1))
+                d_opt_path = os.path.join(self.model_save_dir, '{}-d_opt.ckpt'.format(i+1))
+        
                 torch.save(self.generator.state_dict(), g_path)
+                torch.save(self.generator_ema.state_dict(), g_path_ema)
                 torch.save(self.discriminator.state_dict(), d_path)
                 torch.save(self.sp_enc.state_dict(), sp_path)
+                torch.save(self.sp_enc_ema.state_dict(), sp_path_ema)
+                torch.save(self.g_optimizer.state_dict(), g_opt_path)
+                torch.save(self.d_optimizer.state_dict(), d_opt_path)
                 print('Saved model checkpoints into {}...'.format(self.model_save_dir), flush=True)
             
             

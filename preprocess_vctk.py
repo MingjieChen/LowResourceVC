@@ -15,6 +15,11 @@ import glob
 from os.path import join, basename, exists, isdir
 import subprocess
 import json
+
+from sklearn.preprocessing import StandardScaler
+import joblib
+
+
 def resample(spk, origin_wavpath, target_wavpath, sr = 16000):
     wavfiles = [i for i in os.listdir(join(origin_wavpath, spk)) if i.endswith(".wav")]
     for wav in wavfiles:
@@ -45,40 +50,60 @@ def split_data(paths):
     test_paths = list(np.array(paths)[test_indices])
     return train_paths, test_paths
 
-def get_spk_world_feats(spk_fold_path, mc_dir_train, mc_dir_test, sample_rate=16000, do_split = True):
+def get_spk_world_feats(spk_fold_path, mc_dir_train, mc_dir_test, sample_rate=16000, do_split = True, few_shot = None, norm_global = False):
     paths = glob.glob(join(spk_fold_path, '*.wav'))
+
     spk_name = basename(spk_fold_path)
+    
+
+
+    
     if do_split:
         train_paths, test_paths = split_data(paths)
     else:
         train_paths = paths[:]
+    
+    # few_shot limit the samples for training
+    if few_shot is not None:
+        assert isinstance(few_shot, int)
+        train_paths = train_paths[: few_shot + 5] # add 5 additional samples in case too short samples, extra samples will be filtered at Dataset.
     f0s = []
     coded_sps = []
     
-    # computes mean std for f0 and mceps for each speaker's training data
-    for wav_file in train_paths:
-        f0, _, _, _, coded_sp = world_encode_wav(wav_file, fs=sample_rate)
-        f0s.append(f0)
-        coded_sps.append(coded_sp)
-    log_f0s_mean, log_f0s_std = logf0_statistics(f0s)
-    coded_sps_mean, coded_sps_std = coded_sp_statistics(coded_sps)
-    np.savez(join(mc_dir_train, spk_name+'_stats.npz'), 
-            log_f0s_mean=log_f0s_mean,
-            log_f0s_std=log_f0s_std,
-            coded_sps_mean=coded_sps_mean,
-            coded_sps_std=coded_sps_std)
+    if not norm_global:
+        # computes mean std for f0 and mceps for each speaker's training data
+        for wav_file in train_paths:
+            f0, _, _, _, coded_sp = world_encode_wav(wav_file, fs=sample_rate)
+            f0s.append(f0)
+            coded_sps.append(coded_sp)
+        log_f0s_mean, log_f0s_std = logf0_statistics(f0s)
+        coded_sps_mean, coded_sps_std = coded_sp_statistics(coded_sps)
+        np.savez(join(mc_dir_train, spk_name+'_stats.npz'), 
+                log_f0s_mean=log_f0s_mean,
+                log_f0s_std=log_f0s_std,
+                coded_sps_mean=coded_sps_mean,
+                coded_sps_std=coded_sps_std)
     
-    for wav_file in tqdm(train_paths):
-        wav_nam = basename(wav_file)
-        f0, timeaxis, sp, ap, coded_sp = world_encode_wav(wav_file, fs=sample_rate)
-        normed_coded_sp = normalize_coded_sp(coded_sp, coded_sps_mean, coded_sps_std)
-        np.save(join(mc_dir_train,wav_nam.replace('.wav', '.npy')), normed_coded_sp, allow_pickle=False)
-    
-    for wav_file in tqdm(test_paths):
-        wav_nam = basename(wav_file)
-        f0, timeaxis, sp, ap, coded_sp = world_encode_wav(wav_file, fs=sample_rate)
-        normed_coded_sp = normalize_coded_sp(coded_sp, coded_sps_mean, coded_sps_std)
-        np.save(join(mc_dir_test, wav_nam.replace('.wav', '.npy')), normed_coded_sp, allow_pickle=False)
+        for wav_file in tqdm(train_paths):
+            wav_nam = basename(wav_file)
+            f0, timeaxis, sp, ap, coded_sp = world_encode_wav(wav_file, fs=sample_rate)
+            normed_coded_sp = normalize_coded_sp(coded_sp, coded_sps_mean, coded_sps_std)
+            np.save(join(mc_dir_train,wav_nam.replace('.wav', '.npy')), normed_coded_sp, allow_pickle=False)
+        
+        for wav_file in tqdm(test_paths):
+            wav_nam = basename(wav_file)
+            f0, timeaxis, sp, ap, coded_sp = world_encode_wav(wav_file, fs=sample_rate)
+            normed_coded_sp = normalize_coded_sp(coded_sp, coded_sps_mean, coded_sps_std)
+            np.save(join(mc_dir_test, wav_nam.replace('.wav', '.npy')), normed_coded_sp, allow_pickle=False)
+    else:
+        for wav_file in train_paths:
+            wav_nam = basename(wav_file)
+            f0, timeaxis, sp, ap, coded_sp = world_encode_wav(wav_file, fs = sample_rate, frame_period = 10.0, coded_dim = 36)
+            np.save(join(mc_dir_train, wav_nam.replace('.wav','.npy')), coded_sp, allow_pickle = False)
+        for wav_file in test_paths:
+            wav_nam = basename(wav_file)
+            f0, timeaxis, sp, ap, coded_sp = world_encode_wav(wav_file, fs = sample_rate, frame_period = 10.0, coded_dim = 36)
+            np.save(join(mc_dir_test, wav_nam.replace('.wav','.npy')), coded_sp, allow_pickle = False)
     return 0
 
 
@@ -100,6 +125,11 @@ if __name__ == '__main__':
     parser.add_argument("--speaker_used_path", type = str,default = './speaker_used.json', help = "speaker used")
     parser.add_argument("--num_workers", type = int, default = 10, help = "The number of cpus to use.")
     
+    # [0915 new feature]: add arg few_shot
+    parser.add_argument('--few_shot', type = int, default = None, help = 'few_shot learning setup')
+    # [0915 new feature]: normalise mcep for the whole training set, not for each speaker
+    parser.add_argument('--norm_global', default = False, action = 'store_true')
+    parser.add_argument('--global_mean_var_dir', type = str)   
     parser.add_argument('--do_resample', action= 'store_true', default = False)
     parser.add_argument('--do_split', action= 'store_true', default = False)
     
@@ -153,8 +183,20 @@ if __name__ == '__main__':
     for ind, spk in enumerate(speaker_used):
         print(f"speaker id {ind}")
         spk_path = os.path.join(work_dir, spk)
-        futures.append(executor.submit(partial(get_spk_world_feats, spk_path, mc_dir_train, mc_dir_test, sample_rate, argv.do_split)))
+        futures.append(executor.submit(partial(get_spk_world_feats, spk_path, mc_dir_train, mc_dir_test, sample_rate, argv.do_split, argv.few_shot, argv.norm_global)))
     result_list = [future.result() for future in tqdm(futures)]
     print(result_list)
+    
+    # [0915 new feature]: normalize mcep globally at the end
+    if argv.norm_global:
+        scaler = StandardScaler()
+        train_mc = glob.glob(join(mc_dir_train, '*.npy'))
+        
+        for mc_dir in train_mc:
+            mc = np.load(mc_dir)
+            scaler.partial_fit(mc)
+        joblib.dump(scaler, argv.global_mean_var_dir)
+
+    
     sys.exit(0)
 

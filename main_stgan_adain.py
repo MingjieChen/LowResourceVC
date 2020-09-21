@@ -67,6 +67,7 @@ if __name__ == '__main__':
     parser.add_argument('--spenc', type = str, default = 'SPEncoder')
     parser.add_argument('--drop_affine', default = True, action = 'store_false', help = 'use affine in Generator IN layers')   
     parser.add_argument('--generator', type = str, default = 'Generator')
+    parser.add_argument('--res_block', type = str, default = 'ResidualBlockSplit')
     # Training configuration.
     parser.add_argument('--batch_size', type=int, default=8, help='mini-batch size')
     parser.add_argument('--min_length', type=int, default=256 )

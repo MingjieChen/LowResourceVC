@@ -25,7 +25,7 @@ exp=$exp_root/$exp_name
 
 #exp=exp/0707st2new_spkcls0/
 
-main_script=$root/vc-gan/main.py
+main_script=$root/vc_gan/main.py
 #main_script=main_st2.py
 #main_script=main_st1cin.py
 #main_script=main.py

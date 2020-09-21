@@ -26,20 +26,11 @@ import librosa
 from utils import *
 import glob
 import json
-# Below is the accent info for the used 10 speakers.
-#spk2acc = {'262': 'Edinburgh', #F
-#           '272': 'Edinburgh', #M
-#           '229': 'SouthEngland', #F 
-#           '232': 'SouthEngland', #M
-#           '292': 'NorthernIrishBelfast', #M 
-#           '293': 'NorthernIrishBelfast', #F 
-#           '360': 'AmericanNewJersey', #M
-#           '361': 'AmericanNewJersey', #F
-#           '248': 'India', #F
-#           '251': 'India'} #M
 
-#speakers = ['p262', 'p272', 'p229', 'p232', 'p292', 'p293', 'p360', 'p361', 'p248', 'p251']
-#spk2idx = dict(zip(speakers, range(len(speakers))))
+from concurrent.futures import ProcessPoolExecutor
+import subprocess
+from tqdm import tqdm
+from functools import partial
 
 class TestDataset(object):
     """Dataset for testing.
@@ -199,6 +190,12 @@ def process_test_loader(test_loader, G, device, sampling_rate, num_mcep, frame_p
                 librosa.output.write_wav(join(config.convert_dir, str(config.resume_iters), f'cpsyn-{wav_name}'), wav_cpsyn, sampling_rate)
     return pair_list
 
+
+def _convert(test_loader, G, device, sampling_rate, num_mcep, frame_period, spk2emb, config, sp_enc):
+                
+    pair_list = process_test_loader(test_loader, G, device, sampling_rate, num_mcep, frame_period, spk2emb, config, sp_enc)
+    #all_pair_list.extend(pair_list)
+    #return all_pair_list
     
 
 
@@ -227,7 +224,7 @@ def test(config):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
     if config.generator.startswith('AdaGen'):
-        G = eval(config.generator)(num_speakers = config.num_speakers, aff = config.drop_affine).to(device)
+        G = eval(config.generator)(num_speakers = config.num_speakers, aff = config.drop_affine, res_block_name = config.res_block).to(device)
     elif config.generator == 'LSGen':   
         G = eval(config.generator)(num_speakers = config.num_speakers).to(device)
     # Restore model
@@ -250,20 +247,35 @@ def test(config):
         
         test_loader = TestDataset(config, speakers = speakers)
         pair_list = process_test_loader(test_loader, G, device, sampling_rate, num_mcep, frame_period, spk2emb,config, sp_enc)
-        all_pair_list.extend(pair_list)
+        #all_pair_list.extend(pair_list)
     else:
         # convert all src_trg pairs len(speakers) * (len(speakers) -1) pairs
+        if config.num_workers is not None:
+            futures = []
+            executor = ProcessPoolExecutor(max_workers = config.num_workers)
         for src in speakers:
             for trg in speakers:
                 if src != trg:
-                    
                     test_loader = TestDataset(config, src_spk = src, trg_spk = trg, speakers = speakers)
-                    pair_list = process_test_loader(test_loader, G, device, sampling_rate, num_mcep, frame_period, spk2emb, config, sp_enc)
-                    all_pair_list.extend(pair_list)
+                    if config.num_workers is None:
+                        _convert(test_loader, G, device, sampling_rate, num_mcep, frame_period, spk2emb, config, sp_enc)           
+        
+                    else:
+                        futures.append(
+                            executor.submit(partial(_convert, test_loader, G, device, sampling_rate, 
+                                num_mcep, frame_period, None, config,sp_enc 
+                                ))
+                            
+                        )    
+        if config.num_workers is not None:
+            result_list = [future.result() for future in tqdm(futures, postfix = '\n')]  
+        #            test_loader = TestDataset(config, src_spk = src, trg_spk = trg, speakers = speakers)
+        #            pair_list = process_test_loader(test_loader, G, device, sampling_rate, num_mcep, frame_period, spk2emb, config, sp_enc)
+         #           all_pair_list.extend(pair_list)
     
-    with open(config.pair_list_path,'w') as f:
-        for pair in all_pair_list:
-            f.write(f'{pair[0]} {pair[1]}\n')
+    #with open(config.pair_list_path,'w') as f:
+    #    for pair in all_pair_list:
+    #        f.write(f'{pair[0]} {pair[1]}\n')
 
     """
     # Read a batch of testdata
@@ -318,6 +330,7 @@ if __name__ == '__main__':
     parser.add_argument('--src_spk', type=str, default=None, help = 'target speaker.')
     parser.add_argument('--trg_spk', type=str, default=None, help = 'target speaker.')
     parser.add_argument('--generator', type=str, default='Generator')
+    parser.add_argument('--res_block', type=str, default='ResidualBlockSplit')
     parser.add_argument('--spenc', type = str, default = 'SPEncoder')
     parser.add_argument('--spk_cls', default = False, action = 'store_true')
     parser.add_argument('--drop_affine', default = True, action = 'store_false')
@@ -336,7 +349,8 @@ if __name__ == '__main__':
     parser.add_argument('--cpsyn', default = False, action = 'store_true')
     parser.add_argument('--use_spk_mean', default = False, action = 'store_true', help = 'compute mean of speaker embedding as use it as the input of Generator')
     parser.add_argument('--spk_mean_dir', type = str, help = 'speaker embedding mean vector dir, if use_spk_mean is true')
-
+    
+    parser.add_argument('--num_workers', type = int, default = None, help = 'multi-process')
     config = parser.parse_args()
     
     print(config, flush=True)
