@@ -98,7 +98,8 @@ class Solver(object):
         self.generator.to(self.device)
         self.discriminator.to(self.device)
         self.sp_enc.to(self.device)
-
+        self.generator_ema.to(self.device)
+        self.sp_enc_ema.to(self.device)
     def print_network(self, model, name):
         """Print out the network information."""
         num_params = 0

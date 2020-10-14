@@ -6,10 +6,10 @@ PYTHON=/share/mini1/sw/std/python/anaconda3-2019.07/v3.7/envs/torch_0.4/bin/pyth
 root=/share/mini1/res/t/vc/studio/timap-en/vctk/
 wav_dir=$root/resmp_wav22050/
 #mc_dir=$root/dump/0721mc_10spk_22050/
-mc_dir=$root/dump/0825mc_109spk_22050
-
+#mc_dir=$root/dump/0825mc_109spk_22050
+mc_dir=$root/dump/0915mc_109spk_22050_few_shot20
 exp_root=/share/mini1/res/t/vc/studio/timap-en/vctk/exp/vc-gan/
-exp_name=0827stgan1/
+exp_name=1006stgan1/
 exp=$exp_root/$exp_name
 
 #$PYTHON main.py --wav_dir dump/wav16/
@@ -46,8 +46,8 @@ main_script=$root/vc_gan/main.py
                     --lambda_id 5.0 \
                     --lambda_cls 1.0 \
                     --min_length 256 \
-                    --test_src_spk p229 \
-                    --test_trg_spk p232 \
+                    --test_src_spk p232 \
+                    --test_trg_spk p229 \
                     --sampling_rate 22050 \
                     --speaker_path $mc_dir/speaker_used.json \
                     --batch_size 32 \

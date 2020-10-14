@@ -8,20 +8,21 @@ root=/share/mini1/res/t/vc/studio/timap-en/vctk
 #exp=$root/exp/vc-gan/0722stgan3_0
 
 num_spks=109
-exp=$root/exp/vc-gan/0918stgan3_0
+exp=$root/exp/vc-gan/1006stgan1
 #mc_dir=$root/dump/0825mc_109spk_22050
 #mc_dir=$root/dump/0721mc_10spk_22050/
 mc_dir=$root/dump/0915mc_109spk_22050_few_shot20
-iters=250000
+#mc_dir=$root/dump/0921mc_109spk_22050_few_shot5
+iters=200000
 source_speaker=p232
 speaker_encoder_model=SPEncoder
 #generator_model=LSGen
-generator_model=AdaGenSplit
-#generator_model=AdaGen
+#generator_model=AdaGenSplit
+generator_model=Gen
 #res_block=ResidualBlockSplit
 res_block=Style2ResidualBlock1DBeta
 gen_speaker_emb=false
-convert_all_spks=false
+convert_all_spks=true
 if [ "$gen_speaker_emb" = true ]  && [ $generator_model = AdaGen ]
 then
     $PYTHON $root/vc_gan/speaker_embed.py \
@@ -46,36 +47,44 @@ then
                         --resume_iters $iters \
                         --train_data_dir $mc_dir/train/ \
                         --test_data_dir $mc_dir/test/ \
-                        --convert_dir $exp/converted_samples/ \
+                        --convert_dir $exp/converted_samples_loudnorm/ \
                         --num_speakers $num_spks \
                         --generator $generator_model\
                         --spenc $speaker_encoder_model\
+                        --res_block $res_block \
                         --sample_rate 22050 \
                         --speaker_path $mc_dir/speaker_used.json \
                         --pair_list_path $exp/pair_list.txt\
-                        --num_converted_wavs 1 \
+                        --num_converted_wavs 2 \
+                        #--use_ema
 
 else
-    for trg in p229  p251 p292 p272 p293 p262 p248 p361 p360
-    #for trg in p225 p228 p229 p230 p231 p233 p234 p236 p238 p239 p240
+    for src in p232 p229 p262 p272 p293 p251 p360 p361 p292 p248
     do
-        $PYTHON $root/vc_gan/convert.py \
-                            --wav_dir $root/resmp_wav22050 \
-                            --model_save_dir ${exp}/ckpt/ \
-                            --resume_iters $iters \
-                            --train_data_dir $mc_dir/train/ \
-                            --test_data_dir $mc_dir/test/ \
-                            --convert_dir $exp/converted_samples/ \
-                            --num_speakers $num_spks \
-                            --generator $generator_model\
-                            --res_block $res_block \
-                            --spenc $speaker_encoder_model\
-                            --sample_rate 22050 \
-                            --speaker_path $mc_dir/speaker_used.json \
-                            --pair_list_path $exp/pair_list.txt\
-                            --num_converted_wavs 10 \
-                            --src_spk $source_speaker \
-                            --trg_spk $trg \
-
+        for trg in p232 p229 p262 p272 p293 p251 p360 p361 p292 p248
+        do
+            if [ $src != $trg ]
+            then
+                $PYTHON $root/vc_gan/convert.py \
+                                    --wav_dir $root/resmp_wav22050 \
+                                    --model_save_dir ${exp}/ckpt/ \
+                                    --resume_iters $iters \
+                                    --train_data_dir $mc_dir/train/ \
+                                    --test_data_dir $mc_dir/test/ \
+                                    --convert_dir $exp/converted_samples_loudnorm1/ \
+                                    --num_speakers $num_spks \
+                                    --generator $generator_model\
+                                    --res_block $res_block \
+                                    --spenc $speaker_encoder_model\
+                                    --sample_rate 22050 \
+                                    --speaker_path $mc_dir/speaker_used.json \
+                                    --pair_list_path $exp/pair_list.txt\
+                                    --num_converted_wavs 10 \
+                                    --src_spk $src \
+                                    --trg_spk $trg \
+                                    --use_loudnorm \
+                                    --use_ema 
+            fi
+        done
     done
 fi

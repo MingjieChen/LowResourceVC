@@ -232,7 +232,7 @@ class MyDataset(data.Dataset):
             else:
 
                 mc_files.extend(glob.glob(join(data_dir, f'{spk}_*.npy')))
-                mc_files = self.rm_too_shot_utt(mc_files, min_length)
+                mc_files = self.rm_too_short_utt(mc_files, min_length)
         
         self.mc_files = mc_files[:]
 

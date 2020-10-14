@@ -90,8 +90,8 @@ class ResidualBlock(nn.Module):
         super(ResidualBlock, self).__init__()
         self.conv_1 = nn.Conv1d(dim_in, dim_out, kernel_size=3, stride=1, padding=1, bias = False)
         self.cin_1 = ConditionalInstanceNormalisation(dim_out, style_num)
-        self.relu_1 = nn.GLU(dim = 1)
-
+        #self.relu_1 = nn.GLU(dim = 1)
+        self.relu_1 = GLU()
         
         #self.conv1 = nn.Conv1d(dim_in, dim_out, kernel_size = 3, stride = 1, padding =1)
         #self.conv_norm = ConditionalInstanceNormalisation(dim_out, style_num)
@@ -112,8 +112,6 @@ class ResidualBlock(nn.Module):
         
         #return conv * torch.sigmoid(gate)
         return x_
-
-'''
 class Generator(nn.Module):
     """Generator network."""
     def __init__(self, num_speakers=4, device = None):
@@ -329,7 +327,7 @@ class Generator(nn.Module):
         x = self.out(x)
 
         return x
-
+'''
 class PixelShuffle2d(nn.Module):
     '''pixel shuffle for up samplinga'''
     def __init__(self, factor = 2):
@@ -522,7 +520,6 @@ class Discriminator(nn.Module):
         x = torch.mean(x, dim=-1) + torch.mean(in_prod, dim = -1)    
         #x = torch.sigmoid(x)
         return x
-
 class PatchDiscriminator(nn.Module):
     """Discriminator network with PatchGAN."""
     def __init__(self, input_size=(36, 256), conv_dim=64, repeat_num=5, num_speakers=10):

@@ -31,7 +31,8 @@ from concurrent.futures import ProcessPoolExecutor
 import subprocess
 from tqdm import tqdm
 from functools import partial
-
+#[1006 new feature: add loud norm]
+import pyloudnorm
 class TestDataset(object):
     """Dataset for testing.
         
@@ -91,7 +92,7 @@ class TestDataset(object):
         if batch_size is None:
             batch_size = len(self.mc_files)
         batch_data = []
-        trg_mcfile = self.trg_mc_files[0]
+        trg_mcfile = self.trg_mc_files[1]
         for i in range(batch_size):
             mcfile = self.mc_files[i]
             filename = basename(mcfile)
@@ -115,6 +116,8 @@ def process_test_loader(test_loader, G, device, sampling_rate, num_mcep, frame_p
     test_wavfiles = test_loader.get_batch_test_data(batch_size=config.num_converted_wavs)
     test_wavs = [(load_wav(wavfile, sampling_rate), trg_mc_path ) for wavfile, trg_mc_path in test_wavfiles]
     pair_list = []
+    #[1006 new feature: add loud norm]
+    loud_meter = pyloudnorm.Meter(sampling_rate)
     with torch.no_grad():
         for idx, (wav, trg_mc)  in enumerate(test_wavs):
             print(f'len source wav {len(wav)} trg mc path {trg_mc}', flush=True)
@@ -122,7 +125,9 @@ def process_test_loader(test_loader, G, device, sampling_rate, num_mcep, frame_p
             wav_name = basename(test_wavfiles[idx][0])
             
             # print(wav_name)
-
+            
+            #[1006 new feature: add loud norm]
+            src_loudness = loud_meter.integrated_loudness(wav)
             # get source speech features
             f0, timeaxis, sp, ap = world_decompose(wav=wav, fs=sampling_rate, frame_period=frame_period)
             f0_converted = pitch_conversion(f0=f0, 
@@ -175,6 +180,10 @@ def process_test_loader(test_loader, G, device, sampling_rate, num_mcep, frame_p
             wav_transformed = world_speech_synthesis(f0=f0_converted, coded_sp=coded_sp_converted, 
                                                     ap=ap, fs=sampling_rate, frame_period=frame_period)
             wav_id = wav_name.split('.')[0]
+            #[1006 new feature: add loud norm]
+            output_loudness = loud_meter.integrated_loudness(wav_transformed)
+            if config.use_loudnorm:
+                wav_transformed = pyloudnorm.normalize.loudness(wav_transformed, output_loudness, src_loudness)
 
             cvt_wav_path = f'{wav_id}-{test_loader.src_spk}-vcto-{test_loader.trg_spk}.wav'
             librosa.output.write_wav(join(config.convert_dir, str(config.resume_iters),
@@ -225,17 +234,27 @@ def test(config):
     
     if config.generator.startswith('AdaGen'):
         G = eval(config.generator)(num_speakers = config.num_speakers, aff = config.drop_affine, res_block_name = config.res_block).to(device)
-    elif config.generator == 'LSGen':   
+    elif config.generator == 'LSGen' or config.generator == 'Gen':   
         G = eval(config.generator)(num_speakers = config.num_speakers).to(device)
+    else:
+        raise Exception()
     # Restore model
     print(f'Loading the trained models from step {config.resume_iters}...', flush=True)
-    G_path = join(config.model_save_dir, f'{config.resume_iters}-G.ckpt')
+    # [0922 new feature]: load in ema model ckpt for evaluation
+    if config.use_ema:
+        G_path = join(config.model_save_dir, f'{config.resume_iters}-G.ckpt.ema')
+    else:
+        G_path = join(config.model_save_dir, f'{config.resume_iters}-G.ckpt')
     G.load_state_dict(torch.load(G_path, map_location=lambda storage, loc: storage))
-    G.eval()
+    #G.eval()
     
     if config.generator.startswith('AdaGen'):
         sp_enc = eval(config.spenc)(num_speakers = config.num_speakers,spk_cls = config.spk_cls ).to(device)
-        sp_path = join(config.model_save_dir, f'{config.resume_iters}-sp.ckpt')
+        # [0922 new feature]: load in ema model ckpt for evaluation
+        if config.use_ema:
+            sp_path = join(config.model_save_dir, f'{config.resume_iters}-sp.ckpt.ema')
+        else:
+            sp_path = join(config.model_save_dir, f'{config.resume_iters}-sp.ckpt')
         sp_enc.load_state_dict(torch.load(sp_path, map_location=lambda storage, loc: storage))
         sp_enc.eval()
     else:
@@ -250,25 +269,25 @@ def test(config):
         #all_pair_list.extend(pair_list)
     else:
         # convert all src_trg pairs len(speakers) * (len(speakers) -1) pairs
-        if config.num_workers is not None:
-            futures = []
-            executor = ProcessPoolExecutor(max_workers = config.num_workers)
-        for src in speakers:
+        #if config.num_workers is not None:
+        #    futures = []
+        #    executor = ProcessPoolExecutor(max_workers = config.num_workers)
+        for src in speakers[:25]:
             for trg in speakers:
                 if src != trg:
                     test_loader = TestDataset(config, src_spk = src, trg_spk = trg, speakers = speakers)
-                    if config.num_workers is None:
-                        _convert(test_loader, G, device, sampling_rate, num_mcep, frame_period, spk2emb, config, sp_enc)           
+                    #if config.num_workers is None:
+                    _convert(test_loader, G, device, sampling_rate, num_mcep, frame_period, spk2emb, config, sp_enc)           
         
-                    else:
-                        futures.append(
-                            executor.submit(partial(_convert, test_loader, G, device, sampling_rate, 
-                                num_mcep, frame_period, None, config,sp_enc 
-                                ))
+                    #else:
+                    #    futures.append(
+                    #        executor.submit(partial(_convert, test_loader, G, device, sampling_rate, 
+                    #            num_mcep, frame_period, None, config,sp_enc 
+                    #            ))
                             
-                        )    
-        if config.num_workers is not None:
-            result_list = [future.result() for future in tqdm(futures, postfix = '\n')]  
+                    #    )    
+        #if config.num_workers is not None:
+        #    result_list = [future.result() for future in tqdm(futures, postfix = '\n')]  
         #            test_loader = TestDataset(config, src_spk = src, trg_spk = trg, speakers = speakers)
         #            pair_list = process_test_loader(test_loader, G, device, sampling_rate, num_mcep, frame_period, spk2emb, config, sp_enc)
          #           all_pair_list.extend(pair_list)
@@ -334,7 +353,8 @@ if __name__ == '__main__':
     parser.add_argument('--spenc', type = str, default = 'SPEncoder')
     parser.add_argument('--spk_cls', default = False, action = 'store_true')
     parser.add_argument('--drop_affine', default = True, action = 'store_false')
-    
+    parser.add_argument('--use_ema', default = False, action = 'store_true')
+    parser.add_argument('--use_loudnorm', default = False, action = 'store_true')
     # Directories.
     parser.add_argument('--train_data_dir', type=str, default='./data/mc/train')
     parser.add_argument('--test_data_dir', type=str, default='./data/mc/test')
