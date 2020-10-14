@@ -1,9 +1,10 @@
 import os
 import argparse
-from stgan2.solver import Solver
-from data_loader import get_loader, TestDataset
+from stgan_adain.solver import Solver
+from data_loader import PairDataset, PairTestDataset
 from torch.backends import cudnn
 import json
+from torch.utils import data
 
 def str2bool(v):
     return v.lower() in ('true')
@@ -27,8 +28,16 @@ def main(config):
     print(f"load speakers {speakers}", flush=True)
     
     # Data loader.
-    train_loader = get_loader(config.train_data_dir, config.batch_size, config.min_length, 'train', speakers, num_workers=config.num_workers,)
-    test_loader = TestDataset(config.test_data_dir, config.wav_dir, speakers, src_spk=config.test_src_spk, trg_spk=config.test_trg_spk)
+    #train_loader = get_loader(config.train_data_dir, config.batch_size, config.min_length, 'train', speakers, num_workers=config.num_workers,)
+    
+    train_dataset = PairDataset(config.train_data_dir, speakers, config.min_length, config.few_shot)
+    train_loader = data.DataLoader(dataset=train_dataset,
+                                  batch_size=config.batch_size,
+                                  shuffle=(config.mode=='train'),
+                                  num_workers=config.num_workers,
+                                  drop_last=True)
+    
+    test_loader = PairTestDataset(config.test_data_dir, config.wav_dir, speakers, src_spk=config.test_src_spk, trg_spk=config.test_trg_spk)
 
     # Solver for training and testing StarGAN.
     solver = Solver(train_loader, test_loader, config)
@@ -48,19 +57,32 @@ if __name__ == '__main__':
     parser.add_argument('--lambda_cls', type=float, default=10, help='weight for domain classification loss')
     parser.add_argument('--lambda_rec', type=float, default=10, help='weight for reconstruction loss')
     parser.add_argument('--lambda_gp', type=float, default=10, help='weight for gradient penalty')
+    parser.add_argument('--lambda_adv', type=float, default=10, help='weight for adversarial training')
+    parser.add_argument('--lambda_id', type=float, default=5, help='weight for id mapping loss')
+    parser.add_argument('--lambda_spid', type=float, default=5, help='weight for id mapping loss')
     parser.add_argument('--sampling_rate', type=int, default=16000, help='sampling rate')
     
+    # modules
+    parser.add_argument('--discriminator', type = str, default = 'PatchDiscriminator')
+    parser.add_argument('--spenc', type = str, default = 'SPEncoder')
+    parser.add_argument('--drop_affine', default = True, action = 'store_false', help = 'use affine in Generator IN layers')   
+    parser.add_argument('--generator', type = str, default = 'Generator')
+    parser.add_argument('--res_block', type = str, default = 'ResidualBlockSplit')
     # Training configuration.
-    parser.add_argument('--batch_size', type=int, default=32, help='mini-batch size')
+    parser.add_argument('--batch_size', type=int, default=8, help='mini-batch size')
     parser.add_argument('--min_length', type=int, default=256 )
-    parser.add_argument('--num_iters', type=int, default=200000, help='number of total iterations for training D')
+    parser.add_argument('--num_iters', type=int, default=500000, help='number of total iterations for training D')
+    parser.add_argument('--drop_id_step', type = int, default = 10000, help = 'steps drop id mapping loss')
     parser.add_argument('--num_iters_decay', type=int, default=100000, help='number of iterations for decaying lr')
-    parser.add_argument('--g_lr', type=float, default=0.0001, help='learning rate for G')
+    parser.add_argument('--g_lr', type=float, default=0.0002, help='learning rate for G')
     parser.add_argument('--d_lr', type=float, default=0.0001, help='learning rate for D')
-    parser.add_argument('--n_critic', type=int, default=5, help='number of D updates per each G update')
+    parser.add_argument('--n_critic', type=int, default=1, help='number of D updates per each G update')
     parser.add_argument('--beta1', type=float, default=0.5, help='beta1 for Adam optimizer')
     parser.add_argument('--beta2', type=float, default=0.999, help='beta2 for Adam optimizer')
     parser.add_argument('--resume_iters', type=int, default=None, help='resume training from this step')
+    parser.add_argument('--device', type=int, default=0, help='choosing cuda device')
+    parser.add_argument('--spk_cls', default = False, action = 'store_true', help = 'if or not use spk cls loss for SPEncoder module')
+    parser.add_argument('--few_shot', default = None, type = int, help = 'few shot learning')
 
     # Test configuration.
     parser.add_argument('--test_iters', type=int, default=100000, help='test model from this step')
@@ -85,7 +107,6 @@ if __name__ == '__main__':
     parser.add_argument('--sample_step', type=int, default=1000)
     parser.add_argument('--model_save_step', type=int, default=1000)
     parser.add_argument('--lr_update_step', type=int, default=1000)
-    parser.add_argument('--lambda_id', type=float, default=5, help='weight for id mapping loss')
     
     config = parser.parse_args()
     print(config)
