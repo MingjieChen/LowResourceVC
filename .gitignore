@@ -26,4 +26,4 @@ stadain_map/
 stgan_adain_gse/
 stgan_adain_r1/
 preprocess_vcc.py
-
+evaluate.py
