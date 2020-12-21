@@ -1,7 +1,7 @@
 # Low-resource Voice Conversion GAN 
 This is a voice conversion project aims at 109 speakers with limited training samples.
 
-[Paper](https://github.com/MingjieChen/LowResourceVC) is submitted to ICASSP 2021 
+[Paper](https://arxiv.org/abs/2010.11646) is submitted to ICASSP 2021 
 ### Requirements:
  1. Python3
  2. PyTorch 0.4.1
@@ -10,15 +10,15 @@ This is a voice conversion project aims at 109 speakers with limited training sa
 
 ### Preprocess
 ```
-./run\_pre.sh
+./run_pre.sh
 ```
 
 ### Train:
 ```
-./run\_train\_adain.sh
+./run_train_adain.sh
 ```
 
 ### Convert
 ```
-./run\_convert.sh
+./run_convert.sh
 ```
